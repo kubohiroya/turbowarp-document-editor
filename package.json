@@ -1,0 +1,74 @@
+{
+  "name": "@kubohiroya/turbowarp-document-editor",
+  "version": "0.1.0-rc.0",
+  "description": "Reusable document-source dialog, block previews and external editing for TurboWarp GUI hosts.",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "author": {
+    "name": "Hiroya Kubo",
+    "email": "hiroya@cuc.ac.jp",
+    "url": "https://github.com/kubohiroya"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kubohiroya/turbowarp-document-editor.git"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json",
+    "./style.css": "./src/ui.css",
+    "./client": "./src/client.js",
+    "./block-preview": "./src/block-preview.js",
+    "./document": "./src/document.js",
+    "./hat-entry": "./src/hat-entry.js",
+    "./workspace-patch": "./src/workspace-patch.js",
+    "./dialog-window": "./src/dialog-window.js",
+    "./provider-bootstrap": "./src/provider-bootstrap.js",
+    "./feature-flags": "./src/feature-flags.js",
+    "./host": "./node/host.mjs",
+    "./schema": "./node/schema.mjs",
+    "./vscode": "./node/vscode.mjs",
+    "./cli": "./node/cli.mjs",
+    "./focus-document": "./src/focus-document.js",
+    "./root-shape": "./src/root-shape.js",
+    "./webpack4": "./webpack4.cjs"
+  },
+  "files": [
+    "src",
+    "node",
+    "LICENSE",
+    "README.md",
+    "webpack4.cjs"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@kubohiroya/turbowarp-document-source": "git+https://github.com/kubohiroya/turbowarp-document-source.git#0e05d816b089d972248c58e2019be906fcc02a59",
+    "@kubohiroya/turbowarp-extension-data-editor": "0.7.0",
+    "@kubohiroya/turbowarp-document-data": "0.5.0-rc.1",
+    "yaml": "2.9.1",
+    "ajv": "8.20.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "esbuild": "0.25.12"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node --test test/yaml-ui.browser.mjs",
+    "pack:check": "npm pack --dry-run --ignore-scripts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
+  "bin": {
+    "turbowarp-document-editor": "node/cli.mjs"
+  },
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "sideEffects": [
+    "./src/styles.js"
+  ]
+}
