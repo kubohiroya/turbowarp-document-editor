@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MPL-2.0
+import type {AddressInfo} from 'node:net';
+import type {IncomingMessage, ServerResponse} from 'node:http';
+import type {DocumentEditorHostOptions, LaunchProfile} from './types.ts';
 import {createServer} from 'node:http';
 import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {constants, createReadStream} from 'node:fs';
@@ -6,8 +10,8 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {pipeline} from 'node:stream/promises';
 import {setTimeout as pause} from 'node:timers/promises';
-import {createVSCodeProfile, launchVSCode} from './vscode.mjs';
-import {writeSchemaWorkspace} from './schema.mjs';
+import {createVSCodeProfile, launchVSCode} from './vscode.ts';
+import {writeSchemaWorkspace} from './schema.ts';
 import {normalizeSourceDocumentSchema} from '@kubohiroya/turbowarp-document-data/composition';
 
 export const maxSourceBytes = 4 * 1024 * 1024;
@@ -16,7 +20,7 @@ const maximumBodyBytes = maxSourceBytes * 6 + 2048;
 const maximumSessions = 16;
 const idPattern = /^[a-f0-9]{32}$/;
 const loopbackAddresses = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
-const mimeTypes = {
+const mimeTypes: Record<string, string> = {
     '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
     '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
     '.json': 'application/json; charset=utf-8', '.map': 'application/json',
@@ -26,21 +30,21 @@ const mimeTypes = {
     '.woff': 'font/woff', '.ttf': 'font/ttf', '.mp3': 'audio/mpeg', '.wav': 'audio/wav'
 };
 
-function failure(status, code, message) {
+function failure(status: number, code: string, message: string) {
     return Object.assign(new Error(message), {status, code});
 }
 
-function within(root, filename) {
+function within(root: string, filename: string) {
     const relative = path.relative(root, filename);
     return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
-function json(response, status, value) {
+function json(response: ServerResponse, status: number, value: unknown) {
     response.writeHead(status, {'content-type': 'application/json; charset=utf-8'});
     response.end(JSON.stringify(value));
 }
 
-async function readJSON(request) {
+async function readJSON(request: IncomingMessage) {
     if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] || '')) {
         throw failure(415, 'JSON_REQUIRED', 'Use an application/json request.');
     }
@@ -55,7 +59,7 @@ async function readJSON(request) {
     catch { throw failure(400, 'INVALID_JSON', 'The request is not valid JSON.'); }
 }
 
-async function readSourceOnce(filename) {
+async function readSourceOnce(filename: string) {
     const entry = await lstat(filename).catch(() => { throw failure(409, 'SOURCE_MISSING', 'The working YAML file is unavailable.'); });
     if (!entry.isFile() || entry.isSymbolicLink()) throw failure(403, 'UNSAFE_SOURCE', 'The working YAML must be a regular file.');
     let handle;
@@ -75,12 +79,12 @@ async function readSourceOnce(filename) {
         try { return new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(buffer.subarray(0, count)); }
         catch { throw failure(422, 'INVALID_ENCODING', 'Save the YAML as UTF-8.'); }
     } catch (error) {
-        if (error.code === 'ELOOP') throw failure(403, 'UNSAFE_SOURCE', 'The working YAML must not be a symbolic link.');
+        if ((error as NodeJS.ErrnoException).code === 'ELOOP') throw failure(403, 'UNSAFE_SOURCE', 'The working YAML must not be a symbolic link.');
         throw error;
     } finally { await handle?.close(); }
 }
 
-async function readStableSource(filename) {
+async function readStableSource(filename: string) {
     let previous = await readSourceOnce(filename);
     for (let attempt = 0; attempt < 5; attempt++) {
         await pause(15);
@@ -91,8 +95,8 @@ async function readStableSource(filename) {
     throw failure(409, 'SOURCE_UNSTABLE', 'The YAML is still being saved. Try importing it again.');
 }
 
-export async function startDocumentEditorHost({siteDirectory, dataDirectory, launchEditor = launchVSCode, port = 0, publicPath = '/', editorPath = '/editor.html'} = {}) {
-    const normalizedPath = value => typeof value === 'string' && value.startsWith('/') &&
+export async function startDocumentEditorHost({siteDirectory, dataDirectory, launchEditor = launchVSCode, port = 0, publicPath = '/', editorPath = '/editor.html'}: DocumentEditorHostOptions) {
+    const normalizedPath = (value: unknown): value is string => typeof value === 'string' && value.startsWith('/') &&
         !value.startsWith('//') && !/[?#%\\\u0000-\u001f\u007f]/u.test(value) && path.posix.normalize(value) === value;
     if (!normalizedPath(publicPath) || !publicPath.endsWith('/') || !normalizedPath(editorPath) ||
         !editorPath.startsWith(publicPath) || editorPath === publicPath || editorPath.endsWith('/')) {
@@ -121,10 +125,10 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
     await mkdir(sessionsRoot, {mode: 0o700});
     await writeFile(path.join(storage, 'host.json'), JSON.stringify({createdAt: new Date().toISOString(), dataDirectory: storage, vscodeProfile: profile}, null, 2), {mode: 0o600, flag: 'wx'});
     const token = randomBytes(32).toString('base64url');
-    const sessions = new Map();
-    let apiOrigin;
+    const sessions = new Map<string, {filePath: string; source: string; revision: number; launchOptions: LaunchProfile}>();
+    let apiOrigin: string;
     let closing = false;
-    let closePromise;
+    let closePromise: Promise<void> | undefined;
     let pendingSessions = 0;
     const server = createServer((request, response) => {
         void handle(request, response).catch(error => {
@@ -135,30 +139,30 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
     server.requestTimeout = 15_000;
     server.headersTimeout = 10_000;
 
-    function authorizeRequest(request) {
-        if (!loopbackAddresses.has(request.socket.remoteAddress) || request.headers.host !== new URL(apiOrigin).host) {
+    function authorizeRequest(request: IncomingMessage) {
+        if (!loopbackAddresses.has(request.socket.remoteAddress || '') || request.headers.host !== new URL(apiOrigin).host) {
             throw failure(403, 'INVALID_HOST', 'Only this loopback Editor host is accepted.');
         }
         if (request.headers.origin !== undefined && request.headers.origin !== apiOrigin) {
             throw failure(403, 'INVALID_ORIGIN', 'Use the local Editor from the same origin.');
         }
         const fetchSite = request.headers['sec-fetch-site'];
-        if (fetchSite !== undefined && !['same-origin', 'none'].includes(fetchSite)) {
+        if (fetchSite !== undefined && !['same-origin', 'none'].includes(String(fetchSite))) {
             throw failure(403, 'INVALID_ORIGIN', 'Cross-origin requests are not accepted.');
         }
     }
 
-    function authorizeToken(request) {
+    function authorizeToken(request: IncomingMessage) {
         const received = request.headers['x-twpe-yaml-token'];
         if (typeof received !== 'string' || Buffer.byteLength(received) !== Buffer.byteLength(token) || !timingSafeEqual(Buffer.from(received), Buffer.from(token))) {
             throw failure(401, 'INVALID_TOKEN', 'The local YAML session token is missing or invalid.');
         }
-        if (['POST', 'DELETE'].includes(request.method) && request.headers.origin !== apiOrigin) {
+        if (['POST', 'DELETE'].includes(request.method || '') && request.headers.origin !== apiOrigin) {
             throw failure(403, 'INVALID_ORIGIN', 'A same-origin request is required.');
         }
     }
 
-    async function handleAPI(request, response, pathname) {
+    async function handleAPI(request: IncomingMessage, response: ServerResponse, pathname: string) {
         if (closing) throw failure(503, 'HOST_CLOSED', 'The local YAML host is closing.');
         if (pathname === `${apiPrefix}/config`) {
             if (request.method !== 'GET') throw failure(405, 'METHOD_NOT_ALLOWED', 'Use GET for configuration.');
@@ -238,7 +242,7 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
         json(response, 200, {id, source, revision: session.revision});
     }
 
-    async function handle(request, response) {
+    async function handle(request: IncomingMessage, response: ServerResponse) {
         response.setHeader('cache-control', 'no-store');
         response.setHeader('x-content-type-options', 'nosniff');
         response.setHeader('referrer-policy', 'no-referrer');
@@ -251,7 +255,7 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
             throw failure(403, 'INVALID_PATH', 'Parent paths are not served.');
         }
         if (pathname === apiPrefix || pathname.startsWith(`${apiPrefix}/`)) return handleAPI(request, response, pathname);
-        if (!['GET', 'HEAD'].includes(request.method)) throw failure(405, 'METHOD_NOT_ALLOWED', 'Use GET or HEAD for Editor files.');
+        if (!['GET', 'HEAD'].includes(request.method || '')) throw failure(405, 'METHOD_NOT_ALLOWED', 'Use GET or HEAD for Editor files.');
         if (pathname === '/' || pathname === publicPath.slice(0, -1)) {
             response.writeHead(302, {location: editorPath + '?twPlusYamlEditor=1'});
             response.end();
@@ -271,11 +275,11 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
         await pipeline(createReadStream(filename), response);
     }
 
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
         server.once('error', reject);
         server.listen(port, '127.0.0.1', resolve);
     });
-    apiOrigin = `http://127.0.0.1:${server.address().port}`;
+    apiOrigin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     return Object.freeze({
         url: `${apiOrigin}${editorPath}?twPlusYamlEditor=1`,
         apiOrigin, dataDirectory: storage,
@@ -287,7 +291,7 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
             if (closePromise) return closePromise;
             closing = true;
             sessions.clear();
-            closePromise = new Promise((resolve, reject) => {
+            closePromise = new Promise<void>((resolve, reject) => {
                 server.close(error => error ? reject(error) : resolve());
                 server.closeIdleConnections?.();
             });

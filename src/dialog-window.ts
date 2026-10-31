@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: MPL-2.0
+interface Bounds {x: number; y: number; width: number; height: number;}
+interface Gesture {id: number; target: HTMLElement; edge: string | null; x: number; y: number; rect: Bounds;}
+interface WindowControls {dialog: HTMLDialogElement; titlebar: HTMLElement; maximizeButton: HTMLButtonElement; maximizeLabel: string; restoreLabel: string;}
 // Keep window geometry independent of document editing and owner transactions.
-export function attachDialogWindow({dialog, titlebar, maximizeButton, maximizeLabel, restoreLabel}) {
-  const doc = dialog.ownerDocument, win = doc.defaultView;
-  let gesture = null, restoreBounds = null;
-  const handles = [];
+export function attachDialogWindow({dialog, titlebar, maximizeButton, maximizeLabel, restoreLabel}: WindowControls) {
+  const doc = dialog.ownerDocument, win = doc.defaultView!;
+  let gesture: Gesture | null = null, restoreBounds: Bounds | null = null;
+  const handles: HTMLElement[] = [];
   dialog.classList.add("twpe-yaml-window");
 
   const viewport = () => ({width: win.innerWidth, height: win.innerHeight});
@@ -10,37 +14,37 @@ export function attachDialogWindow({dialog, titlebar, maximizeButton, maximizeLa
     const {x, y, width, height} = dialog.getBoundingClientRect();
     return {x, y, width, height};
   };
-  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-  function fit(rect) {
+  const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+  function fit(rect: Bounds) {
     const view = viewport();
     const width = clamp(rect.width, Math.min(360, view.width), view.width);
     const height = clamp(rect.height, Math.min(280, view.height), view.height);
     return {width, height, x: clamp(rect.x, 0, view.width - width), y: clamp(rect.y, 0, view.height - height)};
   }
-  function place(rect) {
+  function place(rect: Bounds) {
     Object.assign(dialog.style, {
       margin: "0", inset: "auto", left: `${rect.x}px`, top: `${rect.y}px`,
       width: `${rect.width}px`, height: `${rect.height}px`,
     });
   }
-  function stop(event) {
+  function stop(event?: Event & {pointerId?: number}) {
     if (!gesture || (event?.pointerId !== undefined && event.pointerId !== gesture.id)) return;
     const {target, id} = gesture;
     gesture = null;
     if (target.hasPointerCapture(id)) target.releasePointerCapture(id);
     dialog.classList.remove("twpe-yaml-dragging");
   }
-  function start(event, edge) {
+  function start(event: PointerEvent, edge: string | null) {
     if (restoreBounds || gesture || event.button !== 0 || !event.isPrimary) return;
-    if (!edge && event.target.closest("button, a, input, select, textarea")) return;
+    if (!edge && (event.target as Element).closest("button, a, input, select, textarea")) return;
     event.preventDefault();
-    const target = event.currentTarget;
+    const target = event.currentTarget as HTMLElement;
     gesture = {id: event.pointerId, target, edge, x: event.clientX, y: event.clientY, rect: fit(bounds())};
     place(gesture.rect);
     target.setPointerCapture(event.pointerId);
     dialog.classList.add("twpe-yaml-dragging");
   }
-  function move(event) {
+  function move(event: PointerEvent) {
     if (!gesture || event.pointerId !== gesture.id) return;
     const {rect, edge} = gesture, view = viewport();
     const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
@@ -56,7 +60,7 @@ export function attachDialogWindow({dialog, titlebar, maximizeButton, maximizeLa
     if (edge.includes("s")) bottom = clamp(bottom + dy, top + minHeight, view.height);
     place({x: left, y: top, width: right - left, height: bottom - top});
   }
-  const startMove = event => start(event, "");
+  const startMove = (event: PointerEvent) => start(event, "");
   titlebar.addEventListener("pointerdown", startMove);
   for (const edge of ["n", "e", "s", "w", "ne", "se", "sw", "nw"]) {
     const handle = doc.createElement("div");

@@ -1,13 +1,15 @@
+// SPDX-License-Identifier: MPL-2.0
+import type {HostObject} from '../src/types.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { focusDocumentReference } from '../src/focus-document.js';
+import { focusDocumentReference } from '../src/focus-document.ts';
 const reference = { providerId: 'owner', documentId: 'document' };
-const target = (id, scripts) => ({
+const target = (id: string, scripts: Record<string, HostObject>) => ({
     id,
     isOriginal: true,
-    blocks: { getScripts: () => Object.keys(scripts), getBlock: (key) => scripts[key] }
+    blocks: { getScripts: () => Object.keys(scripts), getBlock: (key: string) => scripts[key] }
 });
-const run = (vm) =>
+const run = (vm: HostObject) =>
     focusDocumentReference({
         vm,
         reference,
@@ -20,11 +22,11 @@ const run = (vm) =>
 test('a committed view selects its owning target through public VM APIs and live document refs', () => {
     const stage = target('stage', { 'renamed-short-id': { opcode: 'known_hat', reference } }),
         sprite = target('sprite', {}),
-        calls = [];
+        calls: string[] = [];
     const vm = {
         runtime: { targets: [stage, sprite] },
         editingTarget: sprite,
-        setEditingTarget(id) {
+        setEditingTarget(id: string) {
             calls.push(id);
             this.editingTarget = stage;
         }
@@ -57,13 +59,13 @@ test('unknown opcodes, other documents, malformed refs and clones do not redirec
 test('the current matching target is retained when multiple valid references exist', () => {
     const stage = target('stage', { root: { opcode: 'known_hat', reference } }),
         sprite = target('sprite', { root: { opcode: 'known_hat', reference } }),
-        calls = [];
+        calls: string[] = [];
     assert.equal(
         run({
             runtime: { targets: [stage, sprite] },
             editingTarget: sprite,
-            setEditingTarget: (id) => calls.push(id)
-        }).targetId,
+            setEditingTarget: (id: string) => calls.push(id)
+        })!.targetId,
         'sprite'
     );
     assert.deepEqual(calls, ['sprite']);

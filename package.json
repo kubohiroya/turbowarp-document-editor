@@ -3,7 +3,7 @@
   "version": "0.1.0-rc.0",
   "description": "Reusable document-source dialog, block previews and external editing for TurboWarp GUI hosts.",
   "type": "module",
-  "license": "GPL-3.0-or-later",
+  "license": "MPL-2.0",
   "author": {
     "name": "Hiroya Kubo",
     "email": "hiroya@cuc.ac.jp",
@@ -14,31 +14,85 @@
     "url": "git+https://github.com/kubohiroya/turbowarp-document-editor.git"
   },
   "exports": {
-    ".": "./src/index.js",
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
     "./package.json": "./package.json",
-    "./style.css": "./src/ui.css",
-    "./client": "./src/client.js",
-    "./block-preview": "./src/block-preview.js",
-    "./document": "./src/document.js",
-    "./hat-entry": "./src/hat-entry.js",
-    "./workspace-patch": "./src/workspace-patch.js",
-    "./dialog-window": "./src/dialog-window.js",
-    "./provider-bootstrap": "./src/provider-bootstrap.js",
-    "./feature-flags": "./src/feature-flags.js",
-    "./host": "./node/host.mjs",
-    "./schema": "./node/schema.mjs",
-    "./vscode": "./node/vscode.mjs",
-    "./cli": "./node/cli.mjs",
-    "./focus-document": "./src/focus-document.js",
-    "./root-shape": "./src/root-shape.js",
-    "./webpack4": "./webpack4.cjs"
+    "./style.css": "./dist/src/ui.css",
+    "./client": {
+      "types": "./dist/src/client.d.ts",
+      "default": "./dist/src/client.js"
+    },
+    "./block-preview": {
+      "types": "./dist/src/block-preview.d.ts",
+      "default": "./dist/src/block-preview.js"
+    },
+    "./document": {
+      "types": "./dist/src/document.d.ts",
+      "default": "./dist/src/document.js"
+    },
+    "./hat-entry": {
+      "types": "./dist/src/hat-entry.d.ts",
+      "default": "./dist/src/hat-entry.js"
+    },
+    "./workspace-patch": {
+      "types": "./dist/src/workspace-patch.d.ts",
+      "default": "./dist/src/workspace-patch.js"
+    },
+    "./dialog-window": {
+      "types": "./dist/src/dialog-window.d.ts",
+      "default": "./dist/src/dialog-window.js"
+    },
+    "./provider-bootstrap": {
+      "types": "./dist/src/provider-bootstrap.d.ts",
+      "default": "./dist/src/provider-bootstrap.js"
+    },
+    "./feature-flags": {
+      "types": "./dist/src/feature-flags.d.ts",
+      "default": "./dist/src/feature-flags.js"
+    },
+    "./host": {
+      "types": "./dist/node/host.d.ts",
+      "default": "./dist/node/host.js"
+    },
+    "./schema": {
+      "types": "./dist/node/schema.d.ts",
+      "default": "./dist/node/schema.js"
+    },
+    "./vscode": {
+      "types": "./dist/node/vscode.d.ts",
+      "default": "./dist/node/vscode.js"
+    },
+    "./cli": {
+      "types": "./dist/node/cli.d.ts",
+      "default": "./dist/node/cli.js"
+    },
+    "./focus-document": {
+      "types": "./dist/src/focus-document.d.ts",
+      "default": "./dist/src/focus-document.js"
+    },
+    "./root-shape": {
+      "types": "./dist/src/root-shape.d.ts",
+      "default": "./dist/src/root-shape.js"
+    },
+    "./webpack4": {
+      "types": "./dist/webpack4.d.cts",
+      "default": "./dist/webpack4.cjs"
+    }
   },
   "files": [
+    "dist",
     "src",
     "node",
+    "webpack4.cts",
     "LICENSE",
     "README.md",
-    "webpack4.cjs"
+    "README.ja.md",
+    "tsconfig.json",
+    "scripts",
+    "NOTICE",
+    "docs/license-provenance.md"
   ],
   "engines": {
     "node": ">=24"
@@ -52,23 +106,29 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
-    "esbuild": "0.25.12"
+    "esbuild": "0.25.12",
+    "typescript": "6.0.3",
+    "@types/node": "^24.0.0"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs",
-    "test:browser": "node --test test/yaml-ui.browser.mjs",
-    "pack:check": "npm pack --dry-run --ignore-scripts"
+    "build": "tsc -p tsconfig.json && node scripts/copy-css.ts",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "node --test test/*.test.ts",
+    "test:browser": "node --test test/yaml-ui.browser.ts",
+    "prepare": "npm run build",
+    "pack:check": "npm pack --dry-run"
   },
   "publishConfig": {
     "access": "public",
     "tag": "next"
   },
   "bin": {
-    "turbowarp-document-editor": "node/cli.mjs"
+    "turbowarp-document-editor": "dist/node/cli.js"
   },
-  "main": "./src/index.js",
-  "module": "./src/index.js",
+  "main": "./dist/src/index.js",
+  "module": "./dist/src/index.js",
   "sideEffects": [
-    "./src/styles.js"
-  ]
+    "./dist/src/styles.js"
+  ],
+  "types": "./dist/src/index.d.ts"
 }

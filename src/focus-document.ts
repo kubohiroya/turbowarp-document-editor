@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: MPL-2.0
+import type {HostObject, DocumentRegistry, DocumentReference} from './types.ts';
 /** Select the target that owns this document using live references, never persisted block IDs. */
-export function focusDocumentReference({ vm, registry, readReference, reference }) {
+export function focusDocumentReference({ vm, registry, readReference, reference }: {vm: HostObject; registry: Pick<DocumentRegistry, 'getHatOpcodes'>; readReference: (block: HostObject, target?: HostObject) => DocumentReference; reference: DocumentReference}) {
     if (typeof vm?.setEditingTarget !== 'function' || !Array.isArray(vm.runtime?.targets))
         return null;
     const known = new Set(registry.getHatOpcodes());
-    const targets = vm.runtime.targets.filter((target) => target?.isOriginal !== false);
+    const targets = (vm.runtime.targets as HostObject[]).filter((target) => target?.isOriginal !== false);
     targets.sort(
         (a, b) => Number(b.id === vm.editingTarget?.id) - Number(a.id === vm.editingTarget?.id)
     );

@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: MPL-2.0
+import type {HostObject} from './types.ts';
 import {installProjectPatchWorkspaceAdapter} from '@kubohiroya/turbowarp-document-source/project-views';
 
 /** Redraw only affected document scripts; retain the remaining workspace and its variables. */
-export function attachDocumentWorkspacePatch(vm, B) {
+export function attachDocumentWorkspacePatch(vm: HostObject, B: HostObject) {
     if (typeof B?.Xml?.domToWorkspace !== 'function' || typeof B.Xml.textToDom !== 'function') return () => {};
     return installProjectPatchWorkspaceAdapter(vm, {
         hasBlockDefinition(type) {
@@ -30,7 +32,7 @@ export function attachDocumentWorkspacePatch(vm, B) {
             const check = () => {
                 if (vm.editingTarget !== target || B.getMainWorkspace() !== workspace) throw new Error('The block workspace changed during the document update.');
             };
-            const replace = nodes => {
+            const replace = (nodes: Node[]) => {
                 check();
                 B.Events.disable();
                 try {

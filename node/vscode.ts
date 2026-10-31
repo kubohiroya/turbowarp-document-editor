@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+import type {LaunchOptions, LaunchProfile, ProfilePaths, SpawnProcess} from './types.ts';
 import {access, mkdir, mkdtemp, readdir, realpath, readFile, writeFile} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {homedir} from 'node:os';
@@ -6,11 +8,11 @@ import {spawn} from 'node:child_process';
 import {createConnection} from 'node:net';
 import {setTimeout as pause} from 'node:timers/promises';
 
-function shortSocketPath(directory) {
+function shortSocketPath(directory: string) {
     return Buffer.byteLength(path.join(directory, '1.00-main.sock')) <= 100;
 }
 
-export async function createVSCodeProfile(storage) {
+export async function createVSCodeProfile(storage: string) {
     let directory = storage;
     if (process.platform !== 'win32' && !shortSocketPath(path.join(directory, 'u'))) {
         const temporaryRoot = await realpath(process.platform === 'darwin' ? '/private/tmp' : '/tmp');
@@ -33,11 +35,11 @@ export async function createVSCodeProfile(storage) {
     return {directory, userDataDirectory: resolvedUserData, extensionsDirectory: await realpath(extensionsDirectory), separated: directory !== storage};
 }
 
-async function socketAcceptsConnections(filename) {
-    return new Promise(resolve => {
+async function socketAcceptsConnections(filename: string) {
+    return new Promise<boolean>(resolve => {
         const socket = createConnection({path: filename});
         let settled = false;
-        const finish = accepted => {
+        const finish = (accepted: boolean) => {
             if (settled) return;
             settled = true;
             socket.destroy();
@@ -49,7 +51,7 @@ async function socketAcceptsConnections(filename) {
     });
 }
 
-export async function waitForVSCodeReady(userDataDirectory, {platform = process.platform, timeoutMs = 10_000} = {}) {
+export async function waitForVSCodeReady(userDataDirectory: string, {platform = process.platform, timeoutMs = 10_000}: {platform?: NodeJS.Platform; timeoutMs?: number} = {}) {
     if (platform === 'win32') return;
     const deadline = Date.now() + timeoutMs;
     do {
@@ -59,8 +61,7 @@ export async function waitForVSCodeReady(userDataDirectory, {platform = process.
         }
         await pause(Math.min(100, Math.max(0, deadline - Date.now())));
     } while (Date.now() < deadline);
-    const error = new Error('VSCode did not open its private instance after the launch request.');
-    error.code = 'VSCODE_INSTANCE_UNAVAILABLE';
+    const error = Object.assign(new Error('VSCode did not open its private instance after the launch request.'), {code: 'VSCODE_INSTANCE_UNAVAILABLE'});
     throw error;
 }
 
@@ -77,14 +78,13 @@ export async function findVSCodeExecutable() {
             candidates.push(path.resolve(directory, 'code'));
         }
     }
-    for (const candidate of [...new Set(candidates.filter(Boolean))]) {
+    for (const candidate of [...new Set(candidates.filter((value): value is string => typeof value === 'string'))]) {
         try {
             await access(candidate, constants.X_OK);
             return candidate;
         } catch {}
     }
-    const error = new Error('VSCode is unavailable. Install Visual Studio Code before opening a YAML session.');
-    error.code = 'VSCODE_UNAVAILABLE';
+    const error = Object.assign(new Error('VSCode is unavailable. Install Visual Studio Code before opening a YAML session.'), {code: 'VSCODE_UNAVAILABLE'});
     throw error;
 }
 
@@ -99,7 +99,7 @@ function isolatedEnvironment() {
 }
 
 /** Install only the pinned official YAML extension into the private profile. */
-export async function ensureYamlSupport(profile, {findExecutable = findVSCodeExecutable, spawnProcess = spawn, timeoutMs = 120_000} = {}) {
+export async function ensureYamlSupport(profile: ProfilePaths, {findExecutable = findVSCodeExecutable, spawnProcess = spawn as SpawnProcess, timeoutMs = 120_000}: Pick<LaunchOptions, 'findExecutable' | 'spawnProcess' | 'timeoutMs'> = {}) {
     const installed = async () => {
         for (const name of await readdir(profile.extensionsDirectory)) {
             if (!name.startsWith(`${yamlExtensionId}-${yamlExtensionVersion}`)) continue;
@@ -112,7 +112,7 @@ export async function ensureYamlSupport(profile, {findExecutable = findVSCodeExe
     };
     if (await installed()) return;
     const executable = await findExecutable();
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
         const child = spawnProcess(executable, ['--user-data-dir', profile.userDataDirectory,
             '--extensions-dir', profile.extensionsDirectory, '--install-extension', `${yamlExtensionId}@${yamlExtensionVersion}`],
         {shell: false, stdio: 'ignore', env: isolatedEnvironment()});
@@ -123,15 +123,15 @@ export async function ensureYamlSupport(profile, {findExecutable = findVSCodeExe
     if (!await installed()) throw new Error('The pinned official YAML extension is unavailable in this private profile.');
 }
 
-export async function launchVSCode(filePath, {userDataDirectory, extensionsDirectory, workspaceFile, format = 'yaml'}, {
+export async function launchVSCode(filePath: string, {userDataDirectory, extensionsDirectory, workspaceFile, format = 'yaml'}: LaunchProfile, {
     findExecutable = findVSCodeExecutable,
-    spawnProcess = spawn,
+    spawnProcess = spawn as SpawnProcess,
     platform = process.platform,
     timeoutMs = 15_000,
     startupGraceMs = 500,
     checkReady = waitForVSCodeReady,
     ensureSupport = ensureYamlSupport
-} = {}) {
+}: LaunchOptions = {}) {
     const executable = await findExecutable();
     await mkdir(userDataDirectory, {recursive: true, mode: 0o700});
     await mkdir(extensionsDirectory, {recursive: true, mode: 0o700});
@@ -143,11 +143,11 @@ export async function launchVSCode(filePath, {userDataDirectory, extensionsDirec
         '--user-data-dir', userDataDirectory, '--extensions-dir', extensionsDirectory,
         '--', ...(workspaceFile ? [workspaceFile] : []), filePath
     ];
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
         const child = spawnProcess(executable, args, {shell: false, detached: true, stdio: 'ignore', env});
         let settled = false;
-        let timer;
-        const finish = error => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const finish = (error?: Error) => {
             if (settled) return;
             settled = true;
             clearTimeout(timer);

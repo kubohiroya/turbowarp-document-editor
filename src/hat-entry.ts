@@ -1,23 +1,25 @@
+// SPDX-License-Identifier: MPL-2.0
+import type {HostObject, DocumentRegistry, DocumentReference, ScratchHost} from './types.ts';
 import {bindBlockEditorIcon} from '@kubohiroya/turbowarp-extension-data-editor/turbowarp';
 import {registerEmbeddedYamlRootHatShape} from '@kubohiroya/turbowarp-document-source';
-import {attachDocumentWorkspacePatch} from './workspace-patch.js';
+import {attachDocumentWorkspacePatch} from './workspace-patch.ts';
 
-export function attachEmbeddedYamlHat({vm, registry, readReference, window: win, getScratch, label, canOpen, onOpen, onError = console.error}) {
-    let disposed = false, blocks = null, workspace = null, resolving = false, queued = null, poll = null;
-    const decorations = new Map();
-    let detachWorkspacePatch = null;
+export function attachEmbeddedYamlHat({vm, registry, readReference, window: win, getScratch, label, canOpen, onOpen, onError = console.error}: {vm: HostObject; registry: DocumentRegistry; readReference: (block: HostObject, target?: HostObject) => DocumentReference; window: Window; getScratch: () => ScratchHost | undefined; label: string; canOpen: () => boolean; onOpen: (anchor: {element: HTMLElement | SVGElement; blockId: string; targetId: string; reference?: DocumentReference; error?: unknown}) => void; onError?: (error: unknown) => void}) {
+    let disposed = false, blocks: HostObject | null = null, workspace: HostObject | null = null, resolving = false, queued: number | null = null, poll: number | null = null;
+    const decorations = new Map<string, {field: HostObject; target: HostObject; cleanup(): void}>();
+    let detachWorkspacePatch: (() => void) | null = null;
     const removeDecorations = () => {
         for (const decoration of decorations.values()) decoration.cleanup();
         decorations.clear();
     };
-    const validBlock = block => {
+    const validBlock = (block: HostObject) => {
         if (!workspace || workspace.isFlyout || workspace.options?.readOnly || block.isInFlyout ||
             block.isShadow?.() || block.isEditable?.() === false || !registry.getHatOpcodes().includes(block.type)) return false;
         const target = vm.editingTarget;
         return Boolean(target && workspace.getBlockById(block.id) === block && target.blocks?.getBlock(block.id)?.opcode === block.type);
     };
     function refreshDecorations() {
-        if (disposed || !workspace) return;
+        if (disposed || !workspace || !blocks) return;
         const seen = new Set();
         for (const block of workspace.getAllBlocks(false)) {
             if (!validBlock(block)) continue;
@@ -37,7 +39,7 @@ export function attachEmbeddedYamlHat({vm, registry, readReference, window: win,
             field.setTooltip?.(label);
             const unbind = bindBlockEditorIcon({element, label,
                 canOpen: () => !disposed && validBlock(block) && vm.editingTarget === target &&
-                    !workspace.isDragging?.() && canOpen(),
+                    !workspace?.isDragging?.() && canOpen(),
                 onOpen: () => {
                     const anchor = {element, blockId: block.id, targetId: target.id};
                     try { onOpen({...anchor, reference: readReference(block, target)}); }
@@ -54,7 +56,7 @@ export function attachEmbeddedYamlHat({vm, registry, readReference, window: win,
         }
         for (const [id, decoration] of decorations) if (!seen.has(id)) { decoration.cleanup(); decorations.delete(id); }
     }
-    function switchWorkspace(next) {
+    function switchWorkspace(next: HostObject | null) {
         if (next === workspace) return;
         workspace?.removeChangeListener?.(schedule);
         removeDecorations(); workspace = next;
@@ -101,7 +103,7 @@ export function attachEmbeddedYamlHat({vm, registry, readReference, window: win,
     discover();
     return {refresh: schedule, dispose() {
         if (disposed) return;
-        disposed = true; win.clearTimeout(poll); win.clearTimeout(queued);
+        disposed = true; if (poll !== null) win.clearTimeout(poll); if (queued !== null) win.clearTimeout(queued);
         for (const name of vmEvents) vm.off?.(name, schedule);
         for (const name of runtimeEvents) vm.runtime?.off?.(name, schedule);
         unsubscribe();
