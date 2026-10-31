@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {HostObject, HostWindow, ScratchHost} from './types.ts';
 // A separate read-only ScratchBlocks workspace; it never registers an extension with the VM.
 import {embeddedYamlRootHatShapeExtension, registerEmbeddedYamlRootHatShape} from '@kubohiroya/turbowarp-document-source';

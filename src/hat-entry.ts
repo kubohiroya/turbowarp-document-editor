@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {HostObject, DocumentRegistry, DocumentReference, ScratchHost} from './types.ts';
 import {bindBlockEditorIcon} from '@kubohiroya/turbowarp-extension-data-editor/turbowarp';
 import {registerEmbeddedYamlRootHatShape} from '@kubohiroya/turbowarp-document-source';

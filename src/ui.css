@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 .twpe-yaml-dialog { box-sizing: border-box; font: 14px/1.5 system-ui, sans-serif; color: #163c4a; background: #eefbff; }
 .twpe-yaml-dialog button { min-height: 40px; padding: 7px 13px; border: 1px solid #44778b; border-radius: 7px; background: white; color: #163c4a; font: inherit; cursor: pointer; }
 .twpe-yaml-dialog button:disabled { opacity: .55; cursor: default; }

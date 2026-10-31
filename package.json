@@ -3,7 +3,7 @@
   "version": "0.1.0-rc.0",
   "description": "Reusable document-source dialog, block previews and external editing for TurboWarp GUI hosts.",
   "type": "module",
-  "license": "GPL-3.0-or-later",
+  "license": "MPL-2.0",
   "author": {
     "name": "Hiroya Kubo",
     "email": "hiroya@cuc.ac.jp",
@@ -90,7 +90,9 @@
     "README.md",
     "README.ja.md",
     "tsconfig.json",
-    "scripts"
+    "scripts",
+    "NOTICE",
+    "docs/license-provenance.md"
   ],
   "engines": {
     "node": ">=24"

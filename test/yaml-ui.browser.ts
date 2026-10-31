@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {Browser, Page, Locator} from '@playwright/test';
 import type {Server} from 'node:http';
 import type {AddressInfo} from 'node:net';

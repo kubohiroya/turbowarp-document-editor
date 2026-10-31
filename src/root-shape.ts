@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {HostObject, ScratchHost} from './types.ts';
 interface RootShapeWindow {ScratchBlocks?: HostObject; Scratch?: {gui?: Partial<ScratchHost['gui']>}; setTimeout?(callback: () => void, delay: number): unknown;}
 import {registerEmbeddedYamlRootHatShape} from '@kubohiroya/turbowarp-document-source';

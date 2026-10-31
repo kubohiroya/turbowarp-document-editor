@@ -83,4 +83,4 @@ To roll back, disable the host's startup flags and reload, or restore the previo
 
 ## License
 
-GPL-3.0-or-later, inherited from the implementation extracted from TurboWarp-Plus-Editor. Distribution hosts must retain dependency license notices.
+MPL-2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and the [source provenance review](docs/license-provenance.md). The GUI distribution retains its own license obligations; dependency notices must be preserved.

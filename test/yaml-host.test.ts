@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {TestContext} from 'node:test';
 import type {DocumentEditorHostOptions, LaunchProfile} from '../node/types.ts';
 import type {SpawnOptions} from 'node:child_process';

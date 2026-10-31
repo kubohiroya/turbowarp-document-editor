@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {AddressInfo} from 'node:net';
 import type {IncomingMessage, ServerResponse} from 'node:http';
 import type {DocumentEditorHostOptions, LaunchProfile} from './types.ts';

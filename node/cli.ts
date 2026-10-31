@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MPL-2.0
 import type {CLIOptions, DocumentEditorHostOptions} from './types.ts';
 import {realpathSync} from 'node:fs';
 import path from 'node:path';

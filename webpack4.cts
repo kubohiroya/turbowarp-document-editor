@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 interface WebpackRule {
  loader?: string; include?: unknown; rules?: WebpackRule[]; oneOf?: WebpackRule[];
  [key: string]: unknown;

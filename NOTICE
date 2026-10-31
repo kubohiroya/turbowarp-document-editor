@@ -1,0 +1,15 @@
+turbowarp-document-editor
+Copyright (c) 2026 Hiroya Kubo
+
+The maintained document editor implementation is licensed under MPL-2.0.
+It was developed for the TurboWarp-Plus-Editor document-editing feature and
+extracted into this independent package. The copyright holder authorized
+this package's MPL-2.0 distribution on 2026-11-01.
+
+This package does not include the implementation of scratch-gui,
+scratch-vm or scratch-blocks. These host APIs are supplied by the caller.
+Host distributions and dependencies retain their respective licenses.
+
+Earlier repository revisions distributed under GPL-3.0-or-later remain
+available under the grants made for those revisions. This change does
+not revoke those grants or relicense third-party dependencies.

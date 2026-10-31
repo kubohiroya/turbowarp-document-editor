@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {HostObject, DocumentRegistry, DocumentReference} from './types.ts';
 /** Select the target that owns this document using live references, never persisted block IDs. */
 export function focusDocumentReference({ vm, registry, readReference, reference }: {vm: HostObject; registry: Pick<DocumentRegistry, 'getHatOpcodes'>; readReference: (block: HostObject, target?: HostObject) => DocumentReference; reference: DocumentReference}) {

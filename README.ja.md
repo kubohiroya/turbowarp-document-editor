@@ -65,4 +65,4 @@ npx @kubohiroya/turbowarp-document-editor --site-dir /absolute/path/to/built-gui
 
 ## ライセンス
 
-GPL-3.0-or-later。TurboWarp-Plus-Editorから抽出した実装のライセンスを継承しています。依存パッケージの通知は配信ホストでも保持してください。
+MPL-2.0。[LICENSE](LICENSE)、[NOTICE](NOTICE)、[コード由来の確認記録](docs/license-provenance.md)を参照してください。GUI配布物のライセンス条件と依存パッケージの通知は引き続き維持します。

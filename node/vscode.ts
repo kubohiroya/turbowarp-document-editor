@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {LaunchOptions, LaunchProfile, ProfilePaths, SpawnProcess} from './types.ts';
 import {access, mkdir, mkdtemp, readdir, realpath, readFile, writeFile} from 'node:fs/promises';
 import {constants} from 'node:fs';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {CompanionConfig, Disposable, DocumentAdapter, DocumentEditorOptions, DocumentReference, DocumentSnapshot, ExternalSession, HostWindow, PreviewAttempt, PreviewReady, RepresentationOption} from './types.ts';
 import { createEmbeddedYamlDocument } from "./document.ts";
 import { renderBlockPreview } from "./block-preview.ts";

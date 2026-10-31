@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {HostObject, DocumentReference, DocumentRegistry, DocumentAdapter} from './types.ts';
 import {getSourceDocumentRegistry} from '@kubohiroya/turbowarp-document-data/composition';
 

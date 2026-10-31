@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {HostObject} from './types.ts';
 import {installProjectPatchWorkspaceAdapter} from '@kubohiroya/turbowarp-document-source/project-views';
 

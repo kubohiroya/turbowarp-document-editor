@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 interface Bounds {x: number; y: number; width: number; height: number;}
 interface Gesture {id: number; target: HTMLElement; edge: string | null; x: number; y: number; rect: Bounds;}
 interface WindowControls {dialog: HTMLDialogElement; titlebar: HTMLElement; maximizeButton: HTMLButtonElement; maximizeLabel: string; restoreLabel: string;}

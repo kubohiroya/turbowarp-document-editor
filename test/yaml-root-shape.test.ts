@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import type {HostObject} from '../src/types.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
