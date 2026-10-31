@@ -1,29 +1,30 @@
+import type {HostObject, HostWindow, ScratchHost} from './types.ts';
 // A separate read-only ScratchBlocks workspace; it never registers an extension with the VM.
 import {embeddedYamlRootHatShapeExtension, registerEmbeddedYamlRootHatShape} from '@kubohiroya/turbowarp-document-source';
 let serial = 0;
-const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-const valueOf = field => Array.isArray(field) ? field[0] : record(field) ? field.value : field;
-const fail = message => { throw new Error(message); };
+const record = (value: unknown): value is HostObject => value !== null && typeof value === 'object' && !Array.isArray(value);
+const valueOf = (field: unknown) => Array.isArray(field) ? field[0] : record(field) ? field.value : field;
+function fail(message: string): never { throw new Error(message); }
 
-function menuOptions(menu) {
-    const items = Array.isArray(menu) ? menu : menu?.items;
+function menuOptions(menu: unknown) {
+    const items = Array.isArray(menu) ? menu : record(menu) ? menu.items : undefined;
     if (!Array.isArray(items) || !items.length) fail('Preview menus require static items.');
-    return items.map(item => typeof item === 'string' ? [item, item] :
+    return items.map((item: unknown) => typeof item === 'string' ? [item, item] :
         record(item) && typeof item.text === 'string' && typeof item.value === 'string' ? [item.text, item.value] :
             fail('The preview menu has an unsupported item.'));
 }
 
 /** Convert declarative extension information only; no owner JavaScript is evaluated. */
-export function compilePreviewDefinition(definition, alias, menus = {}) {
+export function compilePreviewDefinition(definition: unknown, alias: string, menus: Record<string, HostObject> = {}) {
     if (!record(definition) || typeof definition.text !== 'string' && !Array.isArray(definition.text)) fail('A preview block declaration is required.');
-    const lines = Array.isArray(definition.text) ? definition.text : [definition.text];
-    const json = {type: alias, inputsInline: true, category: 'extension',
+    const lines: unknown[] = Array.isArray(definition.text) ? definition.text : [definition.text];
+    const json: HostObject = {type: alias, inputsInline: true, category: 'extension',
         colour: definition.color1 || definition.colour || '#5f68a8',
         colourSecondary: definition.color2 || '#505a94', colourTertiary: definition.color3 || '#404b7d'};
     let row = 0, branches = 0;
     for (const [lineIndex, line] of lines.entries()) {
         if (typeof line !== 'string') fail('Preview block labels must be strings.');
-        const args = [];
+        const args: HostObject[] = [];
         let message = line.replace(/\[([A-Za-z][A-Za-z0-9_]*)\]/gu, (_, name) => {
             const argument = definition.arguments?.[name];
             if (!record(argument)) fail(`The preview declaration is missing argument ${name}.`);
@@ -66,7 +67,7 @@ export function compilePreviewDefinition(definition, alias, menus = {}) {
 }
 
 /** Render a provider's plain block graph without changing the live workspace or VM. */
-export async function renderBlockPreview({container, model, getScratch, vm, signal}) {
+export async function renderBlockPreview({container, model, getScratch, vm, signal}: {container: HTMLElement; model: HostObject; getScratch?: () => ScratchHost | undefined; vm: HostObject; signal?: AbortSignal}) {
     if (!container?.ownerDocument || !record(model?.blocks) || !Array.isArray(model.rootIds) || !model.rootIds.length) fail('The owner did not provide a block preview graph.');
     const cancelled = () => {
         if (signal?.aborted) {
@@ -78,7 +79,7 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
     cancelled();
     const entries = Object.entries(model.blocks);
     if (entries.length > 4000 || model.rootIds.length > 128) fail('The document is too large for a block preview.');
-    const Scratch = await (typeof getScratch === 'function' ? getScratch() : container.ownerDocument.defaultView.Scratch);
+    const Scratch = await (typeof getScratch === 'function' ? getScratch() : (container.ownerDocument.defaultView as HostWindow).Scratch);
     cancelled();
     if (typeof Scratch?.gui?.getBlockly !== 'function') fail('The Editor does not provide ScratchBlocks.');
     const B = await Scratch.gui.getBlockly();
@@ -86,7 +87,7 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
     registerEmbeddedYamlRootHatShape(B);
     const main = B.getMainWorkspace();
     if (!main) fail('The Editor workspace is unavailable.');
-    const doc = container.ownerDocument, win = doc.defaultView;
+    const doc = container.ownerDocument, win = doc.defaultView!;
     const number = ++serial, prefix = `twpe_preview_${number}_`;
     const surface = doc.createElement('div');
     surface.className = 'twpe-yaml-block-surface';
@@ -100,9 +101,9 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
     summary.textContent = typeof model.source === 'string' ? model.source : '';
     surface.setAttribute('aria-describedby', summary.id);
     container.replaceChildren(surface, summary);
-    const aliases = new Map(), registered = [], made = [], visited = new Set(), visiting = new Set();
-    const declarations = new Map((model.blockDefinitions || []).map(item => [item.opcode, item]));
-    let workspace, observer, disposed = false;
+    const aliases = new Map<string, string>(), registered: string[] = [], made: Array<[string, HostObject, HostObject]> = [], visited = new Set<string>(), visiting = new Set<string>();
+    const declarations = new Map<string, HostObject>((model.blockDefinitions || []).map((item: HostObject) => [item.opcode, item]));
+    let workspace: HostObject | undefined, observer: ResizeObserver | undefined, disposed = false;
     const restoreMain = () => {const active = B.getMainWorkspace();if (!active || active === workspace) B.mainWorkspace = main;};
     const cleanup = () => {
         if (disposed) return;
@@ -121,7 +122,7 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
         B.Events.enable();
         try {
             restoreMain();
-            await new Promise(resolve => win.setTimeout(resolve, 0));
+            await new Promise<void>(resolve => win.setTimeout(resolve, 0));
             cancelled();
         } finally { B.Events.disable(); }
     };
@@ -133,8 +134,8 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
             media: main.options?.pathToMedia, RTL: Boolean(main.RTL),
             zoom: {controls: true, wheel: true, startScale: 0.85, minScale: 0.25, maxScale: 1.5}});
         restoreMain();
-        surface.dataset.workspaceId = workspace.id;
-        workspace.markFocused = restoreMain;
+        surface.dataset.workspaceId = workspace!.id;
+        workspace!.markFocused = restoreMain;
         for (const [id, data] of entries) {
             if (++steps % 25 === 0) await yieldToEditor();
             if (!record(data) || typeof data.opcode !== 'string') fail(`Invalid preview block ${id}.`);
@@ -148,15 +149,15 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
                     B.defineBlocksWithJsonArray([json]);
                     registered.push(alias); aliases.set(type, alias);
                 }
-                type = aliases.get(type);
+                type = aliases.get(type)!;
             }
-            const block = workspace.newBlock(type, `${prefix}${id}`);
+            const block = workspace!.newBlock(type, `${prefix}${id}`);
             block.setDeletable(false); block.setMovable(false); block.setEditable(false);
             block.data = data.opcode;
             made.push([id, block, data]);
         }
         const byId = new Map(made.map(([id, block]) => [id, block]));
-        function setFields(block, fields) {
+        function setFields(block: HostObject, fields: HostObject) {
             for (const [name, data] of Object.entries(fields || {})) {
                 const field = block.getField(name);
                 if (!field) fail(`The preview block has no field ${name}.`);
@@ -165,7 +166,7 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
                 if (String(field.getValue()) !== value && !(name === 'NUM' && Number(field.getValue()) === Number(value))) fail(`The preview cannot preserve field ${name}.`);
             }
         }
-        function mutationNode(value) {
+        function mutationNode(value: unknown): Element {
             if (!record(value)) fail('Invalid preview mutation.');
             const tag = value.tagName || 'mutation';
             if (!/^[A-Za-z][A-Za-z0-9_-]*$/u.test(tag)) fail('Invalid preview mutation name.');
@@ -185,24 +186,24 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
             if (data.shadow) block.setShadow(true);
             block.initSvg();
         }
-        function literal(value) {
+        function literal(value: unknown) {
             if (!Array.isArray(value)) fail('Invalid preview literal.');
             const type = value[0];
             const numeric = [4, 5, 6, 7, 8].includes(type);
             if (!numeric && type !== 10 && type !== 9) fail('The preview contains an unsupported literal.');
-            const block = workspace.newBlock(numeric ? 'math_number' : type === 9 ? 'colour_picker' : 'text');
+            const block = workspace!.newBlock(numeric ? 'math_number' : type === 9 ? 'colour_picker' : 'text');
             block.setFieldValue(String(value[1] ?? ''), numeric ? 'NUM' : type === 9 ? 'COLOUR' : 'TEXT');
             block.setShadow(true); block.setEditable(false); block.setMovable(false); block.setDeletable(false); block.initSvg(); block.render();
             return block;
         }
-        function edge(input) {
+        function edge(input: unknown) {
             const value = Array.isArray(input) ? input[1] ?? input[2] : record(input) ? input.block || input.shadow : null;
             if (value === null || value === undefined) return null;
             if (typeof value === 'string') return value;
             if (Array.isArray(value)) return value;
             fail('Invalid preview input connection.');
         }
-        async function connect(id) {
+        async function connect(id: string) {
             if (++steps % 25 === 0) await yieldToEditor();
             if (visiting.has(id) || visited.has(id)) fail('The preview graph is cyclic or shared.');
             const data = model.blocks[id], block = byId.get(id);
@@ -235,11 +236,11 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
         }
         for (const [id, block, data] of made) if (!visited.has(id)) {if (!data.shadow) fail('The preview contains unreachable blocks.');block.dispose(false);}
         B.svgResize(workspace);
-        const bounds = workspace.getBlocksBoundingBox();
+        const bounds = workspace!.getBlocksBoundingBox();
         const width = surface.clientWidth || 800;
-        workspace.setScale(Math.max(0.4, Math.min(1, (width - 64) / Math.max(1, bounds.width))));
-        const metrics = workspace.getMetrics();
-        workspace.scrollbar?.set(bounds.x * workspace.scale - metrics.contentLeft - 24, bounds.y * workspace.scale - metrics.contentTop - 24);
+        workspace!.setScale(Math.max(0.4, Math.min(1, (width - 64) / Math.max(1, bounds.width))));
+        const metrics = workspace!.getMetrics();
+        workspace!.scrollbar?.set(bounds.x * workspace!.scale - metrics.contentLeft - 24, bounds.y * workspace!.scale - metrics.contentTop - 24);
         restoreMain();
         cancelled();
         surface.style.visibility = 'visible';

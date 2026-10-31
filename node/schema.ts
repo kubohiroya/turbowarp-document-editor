@@ -4,7 +4,7 @@ import {pathToFileURL} from 'node:url';
 import {normalizeSourceDocumentSchema} from '@kubohiroya/turbowarp-document-data/composition';
 
 /** Associate the exact owner schema without inserting a modeline into the source. */
-export async function writeSchemaWorkspace(directory, metadata, {format = 'yaml', filename = 'story.k4.yml'} = {}) {
+export async function writeSchemaWorkspace(directory: string, metadata: unknown, {format = 'yaml', filename = 'story.k4.yml'}: {format?: 'yaml' | 'json'; filename?: string} = {}) {
     if (metadata === undefined) return null;
     const normalized = normalizeSourceDocumentSchema(metadata);
     const metadataDirectory = path.join(directory, '.twpe');

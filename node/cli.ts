@@ -1,12 +1,13 @@
 #!/usr/bin/env node
+import type {CLIOptions, DocumentEditorHostOptions} from './types.ts';
 import {realpathSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {startDocumentEditorHost} from './host.mjs';
+import {startDocumentEditorHost} from './host.ts';
 
-export function parseArguments(args) {
-    const options = {};
-    const fields = new Map([['--site-dir', 'siteDirectory'], ['--data-dir', 'dataDirectory'], ['--port', 'port']]);
+export function parseArguments(args: string[]) {
+    const options: CLIOptions = {};
+    const fields = new Map<string, keyof CLIOptions>([['--site-dir', 'siteDirectory'], ['--data-dir', 'dataDirectory'], ['--port', 'port']]);
     for (let i = 0; i < args.length; i++) {
         const field = fields.get(args[i]);
         if (!field || options[field] !== undefined || !args[i + 1] || args[i + 1].startsWith('--')) {
@@ -19,10 +20,10 @@ export function parseArguments(args) {
         } else options[field] = path.resolve(value);
     }
     if (!options.siteDirectory) throw new TypeError('--site-dir is required.');
-    return options;
+    return {...options, siteDirectory: options.siteDirectory};
 }
 
-export async function main(args = process.argv.slice(2), defaults = {}) {
+export async function main(args = process.argv.slice(2), defaults: Partial<DocumentEditorHostOptions> & {label?: string} = {}) {
     const host = await startDocumentEditorHost({...defaults, ...parseArguments(args)});
     console.log(`${defaults.label || "Document Editor"}: ${host.url}`);
     console.log(`YAML working files are retained in: ${host.dataDirectory}`);

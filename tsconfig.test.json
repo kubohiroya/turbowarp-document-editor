@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "verbatimModuleSyntax": false
+  },
+  "include": [
+    "src/**/*.ts",
+    "node/**/*.ts",
+    "test/**/*.ts",
+    "webpack4.cts",
+    "scripts/**/*.ts"
+  ]
+}

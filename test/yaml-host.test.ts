@@ -1,3 +1,6 @@
+import type {TestContext} from 'node:test';
+import type {DocumentEditorHostOptions, LaunchProfile} from '../node/types.ts';
+import type {SpawnOptions} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, unlink, writeFile} from 'node:fs/promises';
@@ -5,18 +8,19 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {request} from 'node:http';
 import {EventEmitter} from 'node:events';
-import {startYamlEditorHost, maxSourceBytes} from '../node/host.mjs';
-import {parseArguments} from '../node/cli.mjs';
-import {createVSCodeProfile, launchVSCode, waitForVSCodeReady} from '../node/vscode.mjs';
+class FakeChild extends EventEmitter {unref = () => {}; kill = () => {};}
+import {startYamlEditorHost, maxSourceBytes} from '../node/host.ts';
+import {parseArguments} from '../node/cli.ts';
+import {createVSCodeProfile, launchVSCode, waitForVSCodeReady} from '../node/vscode.ts';
 
-async function fixture(t, options = {}) {
+async function fixture(t: TestContext, options: Partial<DocumentEditorHostOptions> = {}) {
     const directory = await mkdtemp(path.join(tmpdir(), 'twpe-yaml-host-test-'));
     const siteDirectory = path.join(directory, 'site');
     const dataDirectory = path.join(directory, 'data');
     await mkdir(siteDirectory);
     await writeFile(path.join(siteDirectory, 'editor.html'), '<!doctype html><title>Local editor</title>');
     await writeFile(path.join(siteDirectory, 'app.js'), 'window.fixture = true;');
-    const launches = [];
+    const launches: [string, LaunchProfile][] = [];
     const host = await startYamlEditorHost({publicPath:"/turbowarp-plus-editor/",editorPath:"/turbowarp-plus-editor/editor.html",siteDirectory, dataDirectory, launchEditor: async (...args) => launches.push(args), ...options});
     t.after(async () => {
         await host.close();
@@ -33,11 +37,11 @@ async function fixture(t, options = {}) {
     return {directory, siteDirectory, host, launches, config, headers, create};
 }
 
-function rawRequest(origin, pathname, headers = {}) {
-    return new Promise((resolve, reject) => {
+function rawRequest(origin: string, pathname: string, headers: Record<string, string> = {}) {
+    return new Promise<{status: number | undefined; body: string}>((resolve, reject) => {
         const url = new URL(origin);
         const req = request({hostname: url.hostname, port: url.port, path: pathname, headers}, response => {
-            const chunks = [];
+            const chunks: Buffer[] = [];
             response.on('data', chunk => chunks.push(chunk));
             response.on('end', () => resolve({status: response.statusCode, body: Buffer.concat(chunks).toString()}));
         });
@@ -61,7 +65,7 @@ test('serves the local Editor and a same-origin config without putting a token i
     assert.match(await html.text(), /Local editor/);
     assert.equal(html.headers.get('access-control-allow-origin'), null);
     const script = await fetch(`${f.host.apiOrigin}/turbowarp-plus-editor/app.js`);
-    assert.match(script.headers.get('content-type'), /javascript/);
+    assert.match(script.headers.get('content-type')!, /javascript/);
     assert.equal((await stat(f.host.dataDirectory)).mode & 0o777, 0o700);
 });
 
@@ -193,11 +197,12 @@ test('rejects oversized initial or saved sources and non-UTF8 saved files withou
 });
 
 test('retains the YAML on an editor launch failure and keeps session auth private between processes', async t => {
-    let filePath;
+    let filePath: string | undefined;
     const f = await fixture(t, {launchEditor: async filename => { filePath = filename; throw new Error('launch failed'); }});
     const response = await f.create('title: draft');
     assert.equal(response.status, 503);
     assert.equal((await response.json()).code, 'EDITOR_LAUNCH_FAILED');
+    assert(filePath);
     assert.equal(await readFile(filePath, 'utf8'), 'title: draft');
     assert.equal((await readdir(path.join(f.host.dataDirectory, 'sessions'))).length, 1);
     const other = await fixture(t);
@@ -206,12 +211,12 @@ test('retains the YAML on an editor launch failure and keeps session auth privat
 });
 
 test('an installed VSCode CLI exiting nonzero does not report an opened session and uses only fixed arguments', async t => {
-    let launched;
+    let launched: {executable: string; args: string[]; options: SpawnOptions} | undefined;
     const f = await fixture(t, {launchEditor: (filename, profile) => launchVSCode(filename, profile, {
         platform: 'darwin', findExecutable: async () => '/trusted/code',
         spawnProcess: (executable, args, options) => {
             launched = {executable, args, options};
-            const child = new EventEmitter();
+            const child = new FakeChild();
             child.unref = () => {};
             child.kill = () => {};
             queueMicrotask(() => { child.emit('spawn'); child.emit('exit', 1, null); });
@@ -221,14 +226,16 @@ test('an installed VSCode CLI exiting nonzero does not report an opened session 
     const response = await f.create('title: saved draft');
     assert.equal(response.status, 503);
     assert.equal((await response.json()).code, 'EDITOR_LAUNCH_FAILED');
+    assert(launched);
     assert.equal(launched.executable, '/trusted/code');
     assert.equal(launched.options.shell, false);
     assert.ok(launched.args.includes('--disable-extensions'));
     assert.ok(launched.args.includes('--disable-workspace-trust'));
     const filename = launched.args.at(-1);
+    assert(filename);
     assert.equal(launched.args.at(-2), '--');
     assert.equal(await readFile(filename, 'utf8'), 'title: saved draft');
-    assert.equal(launched.options.env.VSCODE_IPC_HOOK_CLI, undefined);
+    assert.equal(launched.options.env?.VSCODE_IPC_HOOK_CLI, undefined);
 });
 
 test('CLI exit zero alone does not report an opened session when the private VSCode IPC is absent', async t => {
@@ -236,7 +243,7 @@ test('CLI exit zero alone does not report an opened session when the private VSC
         platform: 'darwin', findExecutable: async () => '/trusted/code',
         checkReady: (directory, options) => waitForVSCodeReady(directory, {...options, timeoutMs: 30}),
         spawnProcess: () => {
-            const child = new EventEmitter();
+            const child = new FakeChild();
             child.unref = () => {};
             child.kill = () => {};
             queueMicrotask(() => { child.emit('spawn'); child.emit('exit', 0, null); });
@@ -285,8 +292,10 @@ test('each YAML session gets its exact owner schema and private workspace withou
         const response = await f.create(source, {schema});
         assert.equal(response.status, 201);
         assert.equal((await response.json()).schemaId, schema.id);
-        const [file, profile] = f.launches.at(-1);
+        const [file, profile] = f.launches.at(-1)!;
         assert.equal(await readFile(file, 'utf8'), source);
+        assert(profile.schemaFile);
+        assert(profile.workspaceFile);
         assert.equal(path.dirname(profile.schemaFile), path.join(path.dirname(file), '.twpe'));
         assert.equal(path.dirname(profile.workspaceFile), path.join(path.dirname(file), '.twpe'));
         assert.deepEqual(JSON.parse(await readFile(profile.schemaFile, 'utf8')), schema.schema);
@@ -310,14 +319,14 @@ test('schema sessions enable only their private extension directory and open the
     const directory = await mkdtemp(path.join(tmpdir(), 'twpe-schema-launch-'));
     t.after(() => rm(directory, {recursive: true, force: true}));
     const profile = {userDataDirectory: path.join(directory, 'u'), extensionsDirectory: path.join(directory, 'e'), workspaceFile: path.join(directory, 'yaml.code-workspace')};
-    const calls = [];
+    const calls: {executable: string; args: string[]; options: SpawnOptions}[] = [];
     let prepared = false;
     await launchVSCode(path.join(directory, 'story.k4.yml'), profile, {
         findExecutable: async () => '/official/code', checkReady: async () => {},
         ensureSupport: async actual => { assert.equal(actual.extensionsDirectory, profile.extensionsDirectory); prepared = true; },
         spawnProcess(executable, args, options) {
             calls.push({executable, args, options});
-            const child = new EventEmitter(); child.unref = () => {}; child.kill = () => {};
+            const child = new FakeChild(); child.unref = () => {}; child.kill = () => {};
             process.nextTick(() => { child.emit('spawn'); child.emit('exit', 0); });
             return child;
         }
@@ -337,9 +346,10 @@ test('JSON sources use their filename, isolated JSON Schema association and no Y
     for (const sourceName of ['settings.json', 'schema.json', 'session.json']) {
         const response = await f.create(source, {sourceName, format: 'json', schema});
         assert.equal(response.status, 201); assert.equal((await response.json()).format, 'json');
-        const [file, profile] = f.launches.at(-1);
+        const [file, profile] = f.launches.at(-1)!;
         assert.equal(path.basename(file), sourceName); assert.equal(await readFile(file, 'utf8'), source);
         assert.equal(profile.format, 'json');
+        assert(profile.workspaceFile);
         const workspace = JSON.parse(await readFile(profile.workspaceFile, 'utf8'));
         assert.equal(workspace.settings['yaml.schemas'], undefined);
         assert.deepEqual(workspace.settings['json.schemas'][0].fileMatch, [sourceName]);
@@ -356,7 +366,7 @@ test('JSON schema workspaces use the built-in language service without installin
     let installs = 0;
     await launchVSCode(path.join(directory, 'settings.json'), {userDataDirectory: path.join(directory, 'u'), extensionsDirectory: path.join(directory, 'e'), workspaceFile: path.join(directory, '.twpe/editor.code-workspace'), format: 'json'}, {
         findExecutable: async () => '/official/code', checkReady: async () => {}, ensureSupport: async () => { installs++; },
-        spawnProcess() {const child = new EventEmitter(); child.unref = () => {}; child.kill = () => {}; process.nextTick(() => {child.emit('spawn'); child.emit('exit', 0);}); return child;}
+        spawnProcess() {const child = new FakeChild(); child.unref = () => {}; child.kill = () => {}; process.nextTick(() => {child.emit('spawn'); child.emit('exit', 0);}); return child;}
     });
     assert.equal(installs, 0);
 });
@@ -382,5 +392,5 @@ test('host paths cannot redirect outside their configured origin or escape their
         {publicPath: '/gui/', editorPath: '/gui/../editor.html'},
         {publicPath: '/', editorPath: '/%2e%2e/editor.html'},
         {publicPath: '/', editorPath: '/editor.html?token=invalid'}
-    ]) await assert.rejects(startYamlEditorHost(options), /normalized host public path/u);
+    ]) await assert.rejects(startYamlEditorHost({...options, siteDirectory: '/unused'}), /normalized host public path/u);
 });

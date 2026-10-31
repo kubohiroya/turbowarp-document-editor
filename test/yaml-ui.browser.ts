@@ -1,3 +1,10 @@
+import type {Browser, Page, Locator} from '@playwright/test';
+import type {Server} from 'node:http';
+import type {AddressInfo} from 'node:net';
+import type {HostObject} from '../src/types.ts';
+declare global {
+ interface Window {fixture: HostObject; ui: HostObject; fixtureReady: boolean; download?: unknown; replaceProject(): void; oldPreparation: () => void;}
+}
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -7,7 +14,7 @@ import http from "node:http";
 import { chromium } from "@playwright/test";
 import { build } from "esbuild";
 
-let browser, server, directory, base;
+let browser: Browser, server: Server, directory: string, base: string;
 const requests = [];
 const harness = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><style>html,body{height:100%;margin:0}#app{height:100%;background:#eee}.fixture-gui-screen{position:absolute;inset:0;background:#eee}svg{position:absolute;top:100px;left:50px}</style><link rel="stylesheet" href="yaml-editor/ui.css"></head><body><div id="app"><div class="fixture-gui-screen">Editor fixture<svg width="600" height="120"><g id="hat-icon"><rect width="50" height="40" fill="purple"/><text y="25" fill="white">One</text></g><g id="hat-two" transform="translate(100,0)"><rect width="50" height="40" fill="purple"/></g><g id="hat-pref" transform="translate(200,0)"><rect width="50" height="40" fill="blue"/></g><g id="flyout-icon" transform="translate(300,0)"><rect width="50" height="40" fill="gray"/></g><g id="other-icon" transform="translate(400,0)"><rect width="50" height="40" fill="green"/></g></svg></div></div><script type="module">
 import {mountYamlEditor} from './yaml-editor/client.js';
@@ -37,7 +44,7 @@ before(async () => {
     '<html><head></head><body><div id="app"></div></body></html>',
   );
   await fs.mkdir(path.join(directory, "yaml-editor"));
-  for (const name of ["ui.css", "feature-flags.js"])
+  for (const name of ["ui.css"])
     await fs.copyFile(
       new URL("../src/" + name, import.meta.url),
       path.join(directory, "yaml-editor", name),
@@ -45,7 +52,7 @@ before(async () => {
   // Boundary tests replace only rendering; real ScratchBlocks rendering is checked separately.
   await build({
     entryPoints: [
-      "src/client.js",
+      "src/client.ts",
       
     ],
     bundle: true,
@@ -56,7 +63,7 @@ before(async () => {
       {
         name: "fixture-preview-port",
         setup(builder) {
-          builder.onResolve({ filter: /\/block-preview\.js$/ }, () => ({
+          builder.onResolve({ filter: /\/block-preview\.ts$/ }, () => ({
             path: "fixture-preview",
             namespace: "fixture",
           }));
@@ -82,7 +89,7 @@ before(async () => {
     outfile: path.join(directory, "fixture-document.js"),
   });
   server = http.createServer(async (request, response) => {
-    const url = new URL(request.url, "http://localhost");
+    const url = new URL(request.url || '/', "http://localhost");
     requests.push(url.pathname);
     const file = url.pathname.replace("/turbowarp-plus-editor/", "");
     if (file === "fixture.html") {
@@ -121,8 +128,8 @@ before(async () => {
       response.end();
     }
   });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  base = `http://127.0.0.1:${server.address().port}/turbowarp-plus-editor/`;
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/turbowarp-plus-editor/`;
   browser = await chromium.launch({
     headless: true,
     ...(process.env.TWPE_CHROME_EXECUTABLE
@@ -132,23 +139,23 @@ before(async () => {
 });
 after(async () => {
   await browser?.close();
-  await new Promise((resolve) => server?.close(resolve));
+  await new Promise((resolve) => server?.close(() => resolve(undefined)));
   if (directory) await fs.rm(directory, { recursive: true, force: true });
 });
-const icon = (page, id = "hat-icon") =>
+const icon = (page: Page, id = "hat-icon") =>
   page.locator("#" + id + "[data-twpe-yaml-hat-icon]");
-async function readyPage(page, language = "ja") {
+async function readyPage(page: Page, language = "ja") {
   await page.goto(`${base}fixture.html?lang=${language}`);
   await page.waitForFunction(() => window.fixtureReady);
   await icon(page).waitFor();
 }
-async function startSelected(page) {
+async function startSelected(page: Page) {
   await page
     .getByRole("button", { name: /^(外部エディタで編集|Edit in external editor)$/u })
     .click();
   await page.waitForFunction(() => window.ui.getState().session);
 }
-async function startFromIcon(page, id = "hat-icon") {
+async function startFromIcon(page: Page, id = "hat-icon") {
   await icon(page, id).click();
   await startSelected(page);
 }
@@ -184,34 +191,39 @@ test("VSCode can reopen an unchanged session and retry without losing a saved dr
   await page.waitForFunction(() => !window.ui.getState().pending);
   assert.equal(await page.locator("#twpe-yaml-preview").inputValue(), draft);
   assert.equal(await page.evaluate(() => window.fixture.docs['notes:one']), 'theme: light');
-  assert.equal(await page.evaluate(() => window.fixture.calls.filter(c => c.route?.endsWith('/sessions') && c.method === 'POST').length), 1);
+  assert.equal(await page.evaluate(() => window.fixture.calls.filter((c: any) => c.route?.endsWith('/sessions') && c.method === 'POST').length), 1);
   await page.close();
 });
 
-async function drag(page, locator, dx, dy) {
-  const box = await locator.boundingBox();
+async function visibleBounds(locator: Locator) {
+  const bounds = await locator.boundingBox();
+  assert(bounds, 'The tested control must be visible.');
+  return bounds;
+}
+async function drag(page: Page, locator: Locator, dx: number, dy: number) {
+  const box = await visibleBounds(locator);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2 + dy, {steps: 6});
   await page.mouse.up();
 }
-function near(actual, expected) { assert.ok(Math.abs(actual - expected) < 2, `${actual} should equal ${expected}`); }
+function near(actual: number, expected: number) { assert.ok(Math.abs(actual - expected) < 2, `${actual} should equal ${expected}`); }
 
 test("the title moves the dialog, all borders resize it, and maximize restores its geometry", async () => {
   const page = await browser.newPage({viewport: {width: 1440, height: 1100}});
   await readyPage(page);
   await open(page);
-  const initial = await dialog(page).boundingBox();
+  const initial = await visibleBounds(dialog(page));
   await drag(page, dialog(page).getByRole('heading'), 60, 45);
-  let rect = await dialog(page).boundingBox();
+  let rect = await visibleBounds(dialog(page));
   near(rect.x, initial.x + 60); near(rect.y, initial.y + 45);
   near(rect.width, initial.width); near(rect.height, initial.height);
   for (const edge of ['n', 'e', 's', 'w', 'ne', 'se', 'sw', 'nw']) {
-    const before = await dialog(page).boundingBox();
+    const before = await visibleBounds(dialog(page));
     const dx = edge.includes('e') ? 12 : edge.includes('w') ? -12 : 0;
     const dy = edge.includes('s') ? 12 : edge.includes('n') ? -12 : 0;
     await drag(page, dialog(page).locator(`[data-edge="${edge}"]`), dx, dy);
-    rect = await dialog(page).boundingBox();
+    rect = await visibleBounds(dialog(page));
     near(rect.width, before.width + (dx ? 12 : 0));
     near(rect.height, before.height + (dy ? 12 : 0));
     near(rect.x, before.x + (edge.includes('w') ? -12 : 0));
@@ -219,13 +231,13 @@ test("the title moves the dialog, all borders resize it, and maximize restores i
   }
   const restored = rect;
   await dialog(page).getByRole('button', {name: '全画面化', exact: true}).click();
-  rect = await dialog(page).boundingBox();
+  rect = await visibleBounds(dialog(page));
   assert.deepEqual(rect, {x: 0, y: 0, width: 1440, height: 1100});
   await drag(page, dialog(page).getByRole('heading'), 60, 30);
-  assert.deepEqual(await dialog(page).boundingBox(), rect);
+  assert.deepEqual(await visibleBounds(dialog(page)), rect);
   await dialog(page).getByRole('button', {name: '元のサイズに戻す', exact: true}).click();
-  assert.deepEqual(await dialog(page).boundingBox(), restored);
-  assert.equal(await page.evaluate(() => window.fixture.calls.some(c => c.method === 'POST' || typeof c === 'string' && /prepare|commit/.test(c))), false);
+  assert.deepEqual(await visibleBounds(dialog(page)), restored);
+  assert.equal(await page.evaluate(() => window.fixture.calls.some((c: any) => c.method === 'POST' || typeof c === 'string' && /prepare|commit/.test(c))), false);
   await page.close();
 });
 
@@ -234,23 +246,23 @@ test("window controls stay reachable at minimum size, on narrow screens and afte
   await readyPage(page);
   await open(page);
   await drag(page, dialog(page).locator('[data-edge="se"]'), -1000, -1000);
-  let rect = await dialog(page).boundingBox();
+  let rect = await visibleBounds(dialog(page));
   near(rect.width, 360); near(rect.height, 280);
   await drag(page, dialog(page).getByRole('heading'), -1000, -1000);
-  rect = await dialog(page).boundingBox();
+  rect = await visibleBounds(dialog(page));
   near(rect.x, 0); near(rect.y, 0);
   await page.setViewportSize({width: 390, height: 720});
   const maximize = dialog(page).getByRole('button', {name: '全画面化', exact: true});
   await maximize.click();
-  assert.deepEqual(await dialog(page).boundingBox(), {x: 0, y: 0, width: 390, height: 720});
+  assert.deepEqual(await visibleBounds(dialog(page)), {x: 0, y: 0, width: 390, height: 720});
   await page.setViewportSize({width: 320, height: 500});
-  assert.deepEqual(await dialog(page).boundingBox(), {x: 0, y: 0, width: 320, height: 500});
+  assert.deepEqual(await visibleBounds(dialog(page)), {x: 0, y: 0, width: 320, height: 500});
   await dialog(page).getByRole('button', {name: '元のサイズに戻す', exact: true}).click();
-  rect = await dialog(page).boundingBox();
+  rect = await visibleBounds(dialog(page));
   assert.ok(rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= 320 && rect.y + rect.height <= 500);
   const close = dialog(page).getByRole('button', {name: '閉じる', exact: true});
   for (const control of [close, maximize, cancel(page), footerSave(page)]) {
-    const box = await control.boundingBox();
+    const box = await visibleBounds(control);
     assert.ok(box.x >= rect.x && box.y >= rect.y && box.x + box.width <= rect.x + rect.width && box.y + box.height <= rect.y + rect.height);
   }
   await close.click();
@@ -261,44 +273,44 @@ test("window controls stay reachable at minimum size, on narrow screens and afte
   await page.close();
 });
 
-const dialog = (page) =>
+const dialog = (page: Page) =>
   page.getByRole("dialog", { name: "データソース", exact: true });
-const footerSave = (page) =>
+const footerSave = (page: Page) =>
   dialog(page).getByRole("button", {
     name: "表示されている形式に変換して検証・保存",
     exact: true,
   });
-const cancel = (page) =>
+const cancel = (page: Page) =>
   dialog(page).getByRole("button", { name: "キャンセル", exact: true });
-async function open(page) {
+async function open(page: Page) {
   await icon(page).click();
   await dialog(page).waitFor();
 }
-async function closed(page) {
+async function closed(page: Page) {
   await dialog(page).waitFor({ state: "hidden" });
 }
-async function assertNoDownload(page) {
+async function assertNoDownload(page: Page) {
   assert.equal(
     await page.evaluate(
-      () => window.fixture.calls.filter((c) => c === "save").length,
+      () => window.fixture.calls.filter((c: any) => c === "save").length,
     ),
     0,
   );
   assert.equal(await page.evaluate(() => window.fixture.download), undefined);
 }
-async function selectConversion(page) {
+async function selectConversion(page: Page) {
   await page
     .getByRole("tab", { name: "YAMLブロック", exact: true })
     .click();
 }
-const confirmation = (page) =>
+const confirmation = (page: Page) =>
   page.getByRole("dialog", { name: /形式に変換しますか？$/u });
-async function confirmConversion(page) {
+async function confirmConversion(page: Page) {
   await confirmation(page)
     .getByRole("button", { name: "OK", exact: true })
     .click();
 }
-async function saveConversion(page) {
+async function saveConversion(page: Page) {
   await footerSave(page).click();
   await confirmConversion(page);
 }
@@ -319,7 +331,7 @@ test("the chooser has accessible X and bottom-right Cancel/Save, with no legacy 
       .locator(".twpe-yaml-footer")
       .getByRole("button")
       .allTextContents()
-      .then((labels) => labels.join(",")),
+      .then((labels: any) => labels.join(",")),
     "キャンセル,表示されている形式に変換して検証・保存",
   );
   assert.equal(
@@ -332,7 +344,7 @@ test("the chooser has accessible X and bottom-right Cancel/Save, with no legacy 
   );
   assert.equal(
     await page.evaluate(
-      () => window.fixture.calls.filter((c) => c.method === "POST").length,
+      () => window.fixture.calls.filter((c: any) => c.method === "POST").length,
     ),
     0,
   );
@@ -346,7 +358,7 @@ test("the chooser has accessible X and bottom-right Cancel/Save, with no legacy 
   await closed(page);
   assert.deepEqual(
     await page.evaluate(() =>
-      window.fixture.calls.filter((c) => typeof c === "string"),
+      window.fixture.calls.filter((c: any) => typeof c === "string"),
     ),
     ["prepare:notes:one", "stop", "commit:notes:one"],
   );
@@ -368,7 +380,7 @@ test("the chooser has accessible X and bottom-right Cancel/Save, with no legacy 
   );
   assert.equal(
     await page.evaluate(
-      () => window.fixture.calls.filter((c) => c.method === "POST").length,
+      () => window.fixture.calls.filter((c: any) => c.method === "POST").length,
     ),
     0,
   );
@@ -404,7 +416,7 @@ test("selecting a conversion only stages a request and Cancel/X discard without 
       await page.evaluate(
         () =>
           window.fixture.calls.filter(
-            (c) => typeof c === "string" && /prepare|commit/.test(c),
+            (c: any) => typeof c === "string" && /prepare|commit/.test(c),
           ).length,
       ),
       0,
@@ -455,7 +467,7 @@ test("external Save reads the latest workcopy, commits once to the Editor and cl
   );
   assert.equal(
     await page.evaluate(
-      () => window.fixture.calls.filter((c) => c === "commit:notes:one").length,
+      () => window.fixture.calls.filter((c: any) => c === "commit:notes:one").length,
     ),
     1,
   );
@@ -478,7 +490,7 @@ test("an unchanged external workcopy delegates commit so the owner can synchroni
   await closed(page);
   assert.equal(
     await page.evaluate(
-      () => window.fixture.calls.filter((c) => c === "commit:notes:one").length,
+      () => window.fixture.calls.filter((c: any) => c === "commit:notes:one").length,
     ),
     1,
   );
@@ -550,7 +562,7 @@ test("X ends the private session and retains its physical content without leakin
     .selectOption({ label: "settings.yml (preferences / one)" });
   await startSelected(page);
   const post = await page.evaluate(
-    () => window.fixture.calls.filter((c) => c.method === "POST").at(-1).body,
+    () => window.fixture.calls.filter((c: any) => c.method === "POST").at(-1).body,
   );
   assert.equal(post.source, '{"mode":"compact"}\r\n');
   assert.equal(post.format, "json");
@@ -597,7 +609,7 @@ test("Cancel during an external GET or pure prepare invalidates the epoch and pr
       await page.evaluate(
         () =>
           window.fixture.calls.filter(
-            (c) => typeof c === "string" && c.includes("commit"),
+            (c: any) => typeof c === "string" && c.includes("commit"),
           ).length,
       ),
       0,
@@ -619,7 +631,7 @@ test("a delayed workcopy POST is closed on arrival after cancellation", async ()
   await closed(page);
   await page.evaluate(() => window.fixture.resolvePost());
   await page.waitForFunction(() =>
-    Object.values(window.fixture.sessions).every((s) => s.closed),
+    Object.values(window.fixture.sessions).every((s: any) => s.closed),
   );
   assert.equal(await page.evaluate(() => window.ui.getState().session), null);
   assert.equal(
@@ -679,7 +691,7 @@ test("footer Save prepares and applies the selected conversion once, permits ext
     await page.evaluate(
       () =>
         window.fixture.calls.filter(
-          (c) => c === "commit-representation:notes:one",
+          (c: any) => c === "commit-representation:notes:one",
         ).length,
     ),
     1,
@@ -696,7 +708,7 @@ test("footer Save prepares and applies the selected conversion once, permits ext
   const commits = await page.evaluate(
     () =>
       window.fixture.calls.filter(
-        (c) => typeof c === "string" && c.includes("commit-representation"),
+        (c: any) => typeof c === "string" && c.includes("commit-representation"),
       ).length,
   );
   await footerSave(page).click();
@@ -709,7 +721,7 @@ test("footer Save prepares and applies the selected conversion once, permits ext
     await page.evaluate(
       () =>
         window.fixture.calls.filter(
-          (c) => typeof c === "string" && c.includes("commit-representation"),
+          (c: any) => typeof c === "string" && c.includes("commit-representation"),
         ).length,
     ),
     commits,
@@ -755,7 +767,7 @@ test("a confirmed rollback retains the request and a second Save prepares a fres
     await page.evaluate(
       () =>
         window.fixture.calls.filter(
-          (c) => c === "prepare-representation:notes:one",
+          (c: any) => c === "prepare-representation:notes:one",
         ).length,
     ),
     2,
@@ -764,7 +776,7 @@ test("a confirmed rollback retains the request and a second Save prepares a fres
     await page.evaluate(
       () =>
         window.fixture.calls.filter(
-          (c) => c === "commit-representation:notes:one",
+          (c: any) => c === "commit-representation:notes:one",
         ).length,
     ),
     1,
@@ -804,7 +816,7 @@ test("current block-format Save commits edited canonical text and retains its fo
       window.ui.refresh();
     }, kind);
     await open(page);
-    await page.waitForFunction(() => !document.querySelector(".twpe-yaml-save").disabled);
+    await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>(".twpe-yaml-save")!.disabled);
     assert.equal(await page.evaluate(() => window.fixture.docs["notes:one"]), "theme: light");
     await footerSave(page).click();
     await closed(page);
@@ -812,7 +824,7 @@ test("current block-format Save commits edited canonical text and retains its fo
     assert.deepEqual(await page.evaluate(() => window.fixture.lastRepresentationRequest), {kind, direction: "from-source"});
     assert.equal(await page.evaluate(() => window.fixture.docs["notes:one"]), "theme: edited blocks");
     assert.equal(await page.evaluate(() => window.fixture.activeKind), kind);
-    assert.deepEqual(await page.evaluate(() => window.fixture.calls.filter(call => typeof call === "string")), ["prepare-representation:notes:one", "commit-representation:notes:one"]);
+    assert.deepEqual(await page.evaluate(() => window.fixture.calls.filter((call: any) => typeof call === "string")), ["prepare-representation:notes:one", "commit-representation:notes:one"]);
     assert.deepEqual(await page.evaluate(() => window.fixture.previewCalls), [kind]);
     await assertNoDownload(page);
     await page.close();
@@ -832,7 +844,7 @@ test("same-format Save releases its modal for extension approval and restores it
       window.ui.refresh();
     }, reject);
     await open(page);
-    await page.waitForFunction(() => !document.querySelector(".twpe-yaml-save").disabled);
+    await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>(".twpe-yaml-save")!.disabled);
     await footerSave(page).click();
     const approval = page.getByRole("button", {name: "Approve fixture extension", exact: true});
     await approval.waitFor();
@@ -869,7 +881,7 @@ test("same-format Save rejects invalid blocks and Cancel or project replacement 
       window.ui.refresh();
     }, mode);
     await open(page);
-    await page.waitForFunction(() => !document.querySelector(".twpe-yaml-save").disabled);
+    await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>(".twpe-yaml-save")!.disabled);
     await footerSave(page).click();
     if (mode === "failure") {
       await dialog(page).getByRole("alert").filter({hasText: "Invalid block structure"}).waitFor();
@@ -883,7 +895,7 @@ test("same-format Save rejects invalid blocks and Cancel or project replacement 
     }
     await page.waitForTimeout(30);
     assert.equal(await page.evaluate(() => window.fixture.docs["notes:one"]), "theme: light");
-    assert.equal(await page.evaluate(() => window.fixture.calls.some(call => typeof call === "string" && call.includes("commit"))), false);
+    assert.equal(await page.evaluate(() => window.fixture.calls.some((call: any) => typeof call === "string" && call.includes("commit"))), false);
     await assertNoDownload(page);
     await page.close();
   }
@@ -931,7 +943,7 @@ test("Save preparation failure retains the selection and Cancel during preparati
       await page.evaluate(
         () =>
           window.fixture.calls.filter(
-            (c) => typeof c === "string" && c.includes("commit-representation"),
+            (c: any) => typeof c === "string" && c.includes("commit-representation"),
           ).length,
       ),
       0,
@@ -984,7 +996,7 @@ test("a conversion capability removed before or during Save cannot execute a hid
       await page.evaluate(
         () =>
           window.fixture.calls.filter(
-            (c) => typeof c === "string" && c.includes("commit"),
+            (c: any) => typeof c === "string" && c.includes("commit"),
           ).length,
       ),
       0,
@@ -994,7 +1006,7 @@ test("a conversion capability removed before or during Save cannot execute a hid
         await page.evaluate(
           () =>
             window.fixture.calls.filter(
-              (c) => typeof c === "string" && c.includes("prepare"),
+              (c: any) => typeof c === "string" && c.includes("prepare"),
             ).length,
         ),
         0,
@@ -1028,7 +1040,7 @@ test("script data labels, saved-format notes and external editing stay inside th
       assert.equal(await guide.locator("svg[aria-hidden=true]").count(), 1);
       const edit = panel.getByRole("button", {name: "外部エディタで編集", exact: true});
       assert.equal(await edit.isVisible(), true);
-      const layout = await edit.evaluate(button => {
+      const layout = await edit.evaluate((button: any) => {
         const preview = button.parentElement.querySelector("textarea");
         const a = button.getBoundingClientRect(), b = preview.getBoundingClientRect();
         const dialog = button.closest("dialog");
@@ -1074,7 +1086,7 @@ test("Schema HTTPS links replace the URL row and follow the guide in a new tab",
       assert.equal(await schema.locator("svg[aria-hidden=true]").count(), 1);
       assert.equal(await current.locator(".twpe-yaml-source-name").count(), 0);
       assert.equal((await current.innerText()).includes("https://example.test/schema/notes.json"), false);
-      const layout = await schema.evaluate(link => {
+      const layout = await schema.evaluate((link: any) => {
         const guide = link.previousElementSibling;
         const a = guide.getBoundingClientRect(), b = link.getBoundingClientRect();
         const dialog = link.closest("dialog");
@@ -1166,7 +1178,7 @@ test("three accessible tabs mark the saved format, select by keyboard and confir
   await confirmation(page).waitFor();
   assert.equal(
     await page.evaluate(
-      () => window.fixture.calls.filter((c) => typeof c === "string").length,
+      () => window.fixture.calls.filter((c: any) => typeof c === "string").length,
     ),
     0,
   );
@@ -1187,7 +1199,7 @@ test("three accessible tabs mark the saved format, select by keyboard and confir
   assert.equal(await confirmation(page).isVisible(), false);
   assert.equal(
     await page.evaluate(
-      () => window.fixture.calls.filter((c) => typeof c === "string").length,
+      () => window.fixture.calls.filter((c: any) => typeof c === "string").length,
     ),
     0,
   );
@@ -1230,7 +1242,7 @@ test("three accessible tabs mark the saved format, select by keyboard and confir
       .locator(".twpe-yaml-dialog")
       .first()
       .locator("[role=alert]")
-      .textContent(),
+      .textContent() || undefined,
   );
   await closed(page);
   assert.deepEqual(
@@ -1348,7 +1360,7 @@ test("tab previews display only the selected owner model and ignore an older asy
   );
   assert.equal(
     await page.evaluate(
-      () => window.fixture.calls.filter((c) => typeof c === "string").length,
+      () => window.fixture.calls.filter((c: any) => typeof c === "string").length,
     ),
     0,
   );
@@ -1423,7 +1435,7 @@ test("preview errors disable Save while Cancel works and returning from VSCode r
   await page.waitForFunction(
     () =>
       !window.ui.getState().pending &&
-      document.querySelector("#twpe-yaml-preview").value ===
+      document.querySelector<HTMLTextAreaElement>("#twpe-yaml-preview")!.value ===
         "theme: returned-from-vscode",
   );
   assert.equal(
@@ -1484,7 +1496,7 @@ test("legacy owners may preview current raw source but cannot show stale canonic
     }
     assert.equal(
       await page.evaluate(
-        () => window.fixture.calls.filter((c) => typeof c === "string").length,
+        () => window.fixture.calls.filter((c: any) => typeof c === "string").length,
       ),
       0,
     );
@@ -1506,7 +1518,7 @@ test("the selected tab and loading state reach a rendering frame before owner co
     document.addEventListener(
       "click",
       (event) => {
-        if (event.target.closest("[role=tab]")?.dataset.kind === "yaml-blocks")
+        if ((event.target as Element).closest<HTMLButtonElement>("[role=tab]")?.dataset.kind === "yaml-blocks")
           requestAnimationFrame(() => (window.fixture.previewPaintFrame = 1));
       },
       { capture: true, once: true },
@@ -1534,7 +1546,7 @@ test("the selected tab and loading state reach a rendering frame before owner co
   assert.equal(
     await page.evaluate(() =>
       window.fixture.calls.some(
-        (call) => typeof call === "string" && /prepare|commit/.test(call),
+        (call: any) => typeof call === "string" && /prepare|commit/.test(call),
       ),
     ),
     false,
@@ -1553,8 +1565,8 @@ test("rapid tab changes skip obsolete owner work before the next frame and cance
   await page.evaluate(() => {
     window.fixture.previewCalls = [];
     window.fixture.delayPreviewKind = "schema-blocks";
-    document.querySelector('[role=tab][data-kind="yaml-blocks"]').click();
-    document.querySelector('[role=tab][data-kind="schema-blocks"]').click();
+    document.querySelector<HTMLButtonElement>('[role=tab][data-kind="yaml-blocks"]')!.click();
+    document.querySelector<HTMLButtonElement>('[role=tab][data-kind="schema-blocks"]')!.click();
   });
   await page.waitForFunction(
     () =>
@@ -1576,7 +1588,7 @@ test("rapid tab changes skip obsolete owner work before the next frame and cance
   assert.equal(
     await page.evaluate(() =>
       window.fixture.calls.some(
-        (call) => typeof call === "string" && /prepare|commit/.test(call),
+        (call: any) => typeof call === "string" && /prepare|commit/.test(call),
       ),
     ),
     false,

@@ -1,14 +1,15 @@
+import type {HostObject} from '../src/types.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {initializeEmbeddedYamlRootShape} from '../src/root-shape.js';
+import {initializeEmbeddedYamlRootShape} from '../src/root-shape.ts';
 
 function createBlocks() {
-    const calls = [];
-    const shape = {};
-    const blocks = {Extensions: {register(name, callback) {
+    const calls: string[] = [];
+    const shape: {previous?: boolean; next?: boolean} = {};
+    const blocks = {Extensions: {register(name: string, callback: (this: {setPreviousStatement(value: boolean): void; setNextStatement(value: boolean): void}) => void) {
         calls.push(name);
-        callback.call({setPreviousStatement(value) { shape.previous = value; },
-            setNextStatement(value) { shape.next = value; }});
+        callback.call({setPreviousStatement(value: boolean) { shape.previous = value; },
+            setNextStatement(value: boolean) { shape.next = value; }});
     }}};
     return {blocks, calls, shape};
 }
@@ -26,7 +27,7 @@ test('published ScratchBlocks initializes before security approval without creat
 test('a published block instance arriving while approval is pending ends the bounded wait', async () => {
     const {blocks, calls} = createBlocks();
     let polls = 0;
-    const win = {setTimeout(callback) { polls++; win.ScratchBlocks = blocks; queueMicrotask(callback); }};
+    const win: {ScratchBlocks?: HostObject; setTimeout(callback: () => void): void} = {setTimeout(callback) { polls++; win.ScratchBlocks = blocks; queueMicrotask(callback); }};
     await initializeEmbeddedYamlRootShape({window: win, timeoutMs: 1000});
     assert.equal(polls, 1);
     assert.equal(calls.length, 1);

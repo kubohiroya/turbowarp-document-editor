@@ -1,9 +1,10 @@
-import { createEmbeddedYamlDocument } from "./document.js";
-import { renderBlockPreview } from "./block-preview.js";
-import { focusDocumentReference } from "./focus-document.js";
-import { attachEmbeddedYamlHat } from "./hat-entry.js";
-import { getYamlEditorProviders } from "./provider-bootstrap.js";
-import { attachDialogWindow } from "./dialog-window.js";
+import type {CompanionConfig, Disposable, DocumentAdapter, DocumentEditorOptions, DocumentReference, DocumentSnapshot, ExternalSession, HostWindow, PreviewAttempt, PreviewReady, RepresentationOption} from './types.ts';
+import { createEmbeddedYamlDocument } from "./document.ts";
+import { renderBlockPreview } from "./block-preview.ts";
+import { focusDocumentReference } from "./focus-document.ts";
+import { attachEmbeddedYamlHat } from "./hat-entry.ts";
+import { getYamlEditorProviders } from "./provider-bootstrap.ts";
+import { attachDialogWindow } from "./dialog-window.ts";
 
 const messages = {
   ja: {
@@ -61,7 +62,7 @@ const messages = {
     yamlBlocks: "YAMLブロック",
     schemaBlocks: "台本ブロック",
     conversionSource: "変換元の原文",
-    confirmConversion: (label) => `${label}形式に変換しますか？`,
+    confirmConversion: (label: string) => `${label}形式に変換しますか？`,
     conversionUnavailable:
       "選択した変換は利用できなくなりました。変換先を選び直してください。",
     preparingConversion: "変換する内容を検証しています…",
@@ -128,7 +129,7 @@ const messages = {
     yamlBlocks: "YAML blocks",
     schemaBlocks: "Script blocks",
     conversionSource: "Source for conversion",
-    confirmConversion: (label) => `Convert to ${label}?`,
+    confirmConversion: (label: string) => `Convert to ${label}?`,
     conversionUnavailable:
       "The selected conversion is no longer available. Choose a conversion again.",
     preparingConversion: "Validating the conversion…",
@@ -151,13 +152,13 @@ export function mountYamlEditor({
   fetch: fetchOption,
   language,
   documentSources,
-} = {}) {
+}: DocumentEditorOptions) {
   if (!vm) throw new TypeError("An Editor VM is required.");
   const doc = documentOption || globalThis.document,
-    win = doc.defaultView,
+    win = doc.defaultView as HostWindow,
     fetcher = fetchOption || win.fetch.bind(win);
   const sourcesEnabled = documentSources === true;
-  const providers = getYamlEditorProviders(vm, {documentSources: sourcesEnabled}),
+  const providers = getYamlEditorProviders(vm),
     registry = registryOption || providers.registry,
     readReference = readReferenceOption || providers.readReference;
   const locale =
@@ -326,49 +327,49 @@ export function mountYamlEditor({
     commitLocked = false,
     converting = false,
     ignoredCloseEvents = 0;
-  let bridge = null,
-    adapter = null,
-    selected = null,
-    snapshot = null,
-    session = null,
-    draft = null,
-    conversionRequest = null,
-    selectedRepresentation = null,
-    confirmRequested = null,
-    opener = null,
-    hatEntry = null,
+  let bridge: CompanionConfig | null = null,
+    adapter: DocumentAdapter | null = null,
+    selected: DocumentReference | null = null,
+    snapshot: DocumentSnapshot | null = null,
+    session: ExternalSession | null = null,
+    draft: string | null = null,
+    conversionRequest: RepresentationOption['request'] = null,
+    selectedRepresentation: string | null = null,
+    confirmRequested: {epoch: number; target: string | null} | null = null,
+    opener: HTMLElement | SVGElement | null = null,
+    hatEntry: (Disposable & {refresh(): void}) | null = null,
     replacementNotice = false,
     actionStatus = "",
-    sourceLocationDraft = null,
-    preparedSourceLocation = null;
+    sourceLocationDraft: {kind: 'embedded-file' | 'url'; url?: string} | null = null,
+    preparedSourceLocation: Awaited<ReturnType<NonNullable<DocumentAdapter['prepareDataSource']>>> | null = null;
   let previewGeneration = 0,
-    previewAttempt = null,
-    previewReady = null,
-    previewHandle = null,
-    previewAbort = null,
+    previewAttempt: PreviewAttempt | null = null,
+    previewReady: PreviewReady | null = null,
+    previewHandle: Disposable | null = null,
+    previewAbort: AbortController | null = null,
     previewPending = false;
-  let optionReferences = new Map(),
-    representationOptions = new Map();
-  const key = (reference) =>
+  let optionReferences = new Map<string, DocumentReference>(),
+    representationOptions = new Map<string, RepresentationOption>();
+  const key = (reference: DocumentReference) =>
     JSON.stringify([reference.providerId, reference.documentId]);
-  const same = (a, b) => Boolean(a && b && key(a) === key(b));
+  const same = (a: DocumentReference | null, b: DocumentReference | null) => Boolean(a && b && key(a) === key(b));
   function paragraph(content = "") {
     const node = doc.createElement("p");
     node.textContent = content;
     return node;
   }
-  function button(label) {
+  function button(label: string) {
     const node = doc.createElement("button");
     node.type = "button";
     node.textContent = label;
     return node;
   }
-  function showStatus(message) {
+  function showStatus(message: string) {
     actionStatus = message;
     status.textContent = message;
   }
-  function showError(cause, message = text.failed) {
-    error.textContent = `${message}${cause?.message ? ` ${cause.message}` : ""}`;
+  function showError(cause: unknown, message = text.failed) {
+    error.textContent = `${message}${cause instanceof Error ? ` ${cause.message}` : ""}`;
     error.tabIndex = -1;
     if (dialog.open) error.focus();
   }
@@ -386,13 +387,13 @@ export function mountYamlEditor({
     try {
       return adapter?.inspect() || { available: false };
     } catch (cause) {
-      return { available: false, reason: cause.message };
+      return { available: false, reason: cause instanceof Error ? cause.message : String(cause) };
     }
   }
   function hasWork() {
     return Boolean(session) || draft !== null || Boolean(conversionRequest) || Boolean(sourceLocationDraft);
   }
-  function current(generation, owner = adapter) {
+  function current(generation: number, owner = adapter) {
     return !disposed && epoch === generation && adapter === owner;
   }
   function displayedPreviewMatches() {
@@ -426,9 +427,10 @@ export function mountYamlEditor({
     if (!adapter || !snapshot) return;
     const generation = epoch,
       owner = adapter,
-      baseline = snapshot,
+      baseline = snapshot!,
       kind = selectedRepresentation,
       token = ++previewGeneration;
+    if (!kind) return;
     previewAbort?.abort();
     const controller = new AbortController();
     previewAbort = controller;
@@ -436,7 +438,7 @@ export function mountYamlEditor({
     previewHandle = null;
     blockPreview.replaceChildren();
     if (kind === "source") preview.value = "";
-    previewAttempt = { owner, snapshot: baseline, kind };
+    previewAttempt = { owner, snapshot: baseline!, kind };
     previewReady = null;
     previewPending = true;
     render();
@@ -447,7 +449,7 @@ export function mountYamlEditor({
       previewGeneration === token;
     try {
       // Paint the selected tab and loading state before invoking an owner conversion.
-      await new Promise((resolve) => {
+      await new Promise<void>((resolve) => {
         if (typeof win.requestAnimationFrame === "function")
           win.requestAnimationFrame(() => win.setTimeout(resolve, 0));
         else win.setTimeout(resolve, 0);
@@ -455,9 +457,9 @@ export function mountYamlEditor({
       if (!valid()) return;
       const model =
         kind === "source" && draft !== null
-          ? { kind, source: draft }
+          ? { kind, source: draft! }
           : typeof owner.previewRepresentation === "function"
-            ? await owner.previewRepresentation(baseline, { kind })
+            ? await owner.previewRepresentation(baseline!, { kind })
             : kind === "source" &&
                 (metadata()?.activeRepresentation || "source") === "source"
               ? { kind, source: baseline.source }
@@ -481,7 +483,7 @@ export function mountYamlEditor({
         previewHandle = handle;
       }
       if (!valid()) return;
-      previewReady = { owner, snapshot: baseline, kind, source: model.source };
+      previewReady = { owner, snapshot: baseline!, kind, source: model.source };
     } catch (cause) {
       if (valid()) showError(cause);
     } finally {
@@ -491,7 +493,7 @@ export function mountYamlEditor({
       }
     }
   }
-  function formatLabel(kind, entry = metadata()) {
+  function formatLabel(kind: string, entry = metadata()) {
     if (kind === "source")
       return entry?.format === "json" ? text.rawJSON : text.rawYAML;
     if (kind === "yaml-blocks") return text.yamlBlocks;
@@ -504,7 +506,7 @@ export function mountYamlEditor({
     const active = entry?.activeRepresentation || "source";
     const capabilities = entry?.representations || [];
     const activeCapability = capabilities.find((item) => item.kind === active);
-    const options = new Map([
+    const options = new Map<string, RepresentationOption>([
       [
         "source",
         {
@@ -547,7 +549,7 @@ export function mountYamlEditor({
       });
     return options;
   }
-  function chooseFormat(kind) {
+  function chooseFormat(kind: string) {
     const item = formatOptions().get(kind);
     if (pending || session || !item || item.available === false) return;
     selectedRepresentation = kind;
@@ -556,12 +558,12 @@ export function mountYamlEditor({
     error.textContent = "";
     showStatus(text.ready);
     render();
-    [...tablist.children].find((tab) => tab.dataset.kind === kind)?.focus();
+    [...tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((tab) => tab.dataset.kind === kind)?.focus();
   }
   function render() {
     if (disposed) return;
     const focusedTab = tablist.contains(doc.activeElement)
-      ? doc.activeElement.dataset.kind
+      ? (doc.activeElement as HTMLElement | null)?.dataset.kind
       : null;
     const listed = entries(),
       entry = listed.find((item) => same(item.reference, selected)),
@@ -601,7 +603,7 @@ export function mountYamlEditor({
     sourceLoad.disabled = sourceLocation.disabled || !sourceLocationDraft;
     sourceHint.hidden = entry?.dataSource?.kind !== "url" && location.kind !== "url";
     saveButton.textContent = sourceLocationDraft || entry?.dataSource?.kind === "url" ? text.sourceSave : text.save;
-    for (const [link, value] of [[docsLink, entry?.docsURL], [schemaLink, entry?.schema?.id]]) {
+    for (const [link, value] of [[docsLink, entry?.docsURL], [schemaLink, entry?.schema?.id]] as const) {
       let url = null;
       try {
         if (value && new URL(value).protocol === "https:") url = value;
@@ -666,12 +668,12 @@ export function mountYamlEditor({
         return tab;
       }),
     );
-    const selectedTab = [...tablist.children].find(
+    const selectedTab = [...tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
       (tab) => tab.dataset.kind === selectedRepresentation,
     );
     if (selectedTab) panel.setAttribute("aria-labelledby", selectedTab.id);
     if (focusedTab)
-      [...tablist.children]
+      [...tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
         .find((tab) => tab.dataset.kind === focusedTab && !tab.disabled)
         ?.focus();
     activeNote.textContent =
@@ -693,7 +695,7 @@ export function mountYamlEditor({
     if (adapter && snapshot && !pending && !samePreviewAttempt())
       void loadPreview();
   }
-  async function request(route, options = {}) {
+  async function request(route: string, options: RequestInit = {}) {
     const response = await fetcher(`/__twpe_yaml${route}`, {
       ...options,
       credentials: "same-origin",
@@ -711,13 +713,12 @@ export function mountYamlEditor({
       throw new Error(text.localOnly);
     }
     if (!response.ok) {
-      const cause = new Error(value.error || text.failed);
-      cause.code = value.code;
+      const cause = Object.assign(new Error(value.error || text.failed), {code: value.code});
       throw cause;
     }
     return value;
   }
-  function endSession(id) {
+  function endSession(id?: string) {
     if (id && bridge)
       request(`/sessions/${encodeURIComponent(id)}`, {
         method: "DELETE",
@@ -792,7 +793,7 @@ export function mountYamlEditor({
     showStatus(replacementNotice ? text.replaced : text.ready);
     render();
   }
-  async function operate(operation, failure = text.failed) {
+  async function operate(operation: (generation: number, owner: DocumentAdapter) => Promise<void>, failure = text.failed) {
     if (pending || disposed || !adapter) return;
     const generation = epoch,
       owner = adapter;
@@ -814,9 +815,9 @@ export function mountYamlEditor({
       }
     }
   }
-  async function activate(reference) {
+  async function activate(reference: DocumentReference) {
     if (disposed || pending || hasWork()) return;
-    let next;
+    let next: DocumentAdapter | undefined;
     try {
       next = createEmbeddedYamlDocument(vm, reference, registry);
       const state = next.inspect();
@@ -844,7 +845,7 @@ export function mountYamlEditor({
       if (current(generation, next)) {pending = false; render();}
     }
   }
-  async function openFromHat(anchor) {
+  async function openFromHat(anchor: {element: HTMLElement | SVGElement; reference?: DocumentReference; error?: unknown}) {
     if (disposed || pending || dialog.open) return;
     opener = anchor.element;
     error.textContent = "";
@@ -854,7 +855,7 @@ export function mountYamlEditor({
       return;
     }
     // Cancelling a dialog ends its private work. A new opening always captures live Editor state.
-    await activate(anchor.reference);
+    await activate(anchor.reference!);
   }
   closeButton.addEventListener("click", cancelWork);
   cancelButton.addEventListener("click", cancelWork);
@@ -884,18 +885,18 @@ export function mountYamlEditor({
     operate(async (generation, owner) => {
       if (session) {
         showStatus(text.starting);
-        await request(`/sessions/${encodeURIComponent(session.id)}`, {method: "POST"});
+        await request(`/sessions/${encodeURIComponent(session!.id)}`, {method: "POST"});
         if (current(generation, owner)) showStatus(text.editing);
         return;
       }
       capture();
       showStatus(text.starting);
       const entry = metadata(),
-        sourceName = snapshot.sourceName || entry?.filename;
+        sourceName = snapshot!.sourceName || entry?.filename;
       const created = await request("/sessions", {
         method: "POST",
         body: JSON.stringify({
-          source: snapshot.source,
+          source: snapshot!.source,
           sourceName,
           ...(entry?.format ? { format: entry.format } : {}),
           ...(entry?.schema ? { schema: entry.schema } : {}),
@@ -909,33 +910,33 @@ export function mountYamlEditor({
       showStatus(text.editing);
     }),
   );
-  async function readWorkcopy(generation, owner) {
-    const saved = await request(`/sessions/${encodeURIComponent(session.id)}`);
+  async function readWorkcopy(generation: number, owner: DocumentAdapter) {
+    const saved = await request(`/sessions/${encodeURIComponent(session!.id)}`);
     if (!current(generation, owner)) return null;
     if (typeof saved.source !== "string") throw new Error(text.failed);
     if (
       new TextEncoder().encode(saved.source).byteLength >
-      Math.min(bridge.maxSourceBytes || 4194304, 4194304)
+      Math.min(bridge!.maxSourceBytes || 4194304, 4194304)
     )
       throw new Error(text.tooLarge);
     draft = saved.source;
     previewGeneration++;
-    previewAttempt = { owner, snapshot, kind: "source" };
+    previewAttempt = { owner, snapshot: snapshot!, kind: "source" };
     previewPending = false;
-    previewReady = { owner, snapshot, kind: "source", source: draft };
-    preview.value = draft;
-    if (typeof saved.revision === "number") session.revision = saved.revision;
+    previewReady = { owner, snapshot: snapshot!, kind: "source", source: draft! };
+    preview.value = draft!;
+    if (typeof saved.revision === "number") session!.revision = saved.revision;
     return saved.source;
   }
   tablist.addEventListener("click", (event) => {
-    const tab = event.target.closest("[role=tab]");
-    if (tab && !tab.disabled) chooseFormat(tab.dataset.kind);
+    const tab = (event.target as Element).closest<HTMLButtonElement>("[role=tab]");
+    if (tab && !tab.disabled) chooseFormat(tab.dataset.kind!);
   });
   tablist.addEventListener("keydown", (event) => {
-    const tab = event.target.closest("[role=tab]");
+    const tab = (event.target as Element).closest<HTMLButtonElement>("[role=tab]");
     if (!tab || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
       return;
-    const tabs = [...tablist.children].filter((item) => !item.disabled),
+    const tabs = [...tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')].filter((item) => !item.disabled),
       index = tabs.indexOf(tab);
     if (index < 0) return;
     event.preventDefault();
@@ -947,7 +948,7 @@ export function mountYamlEditor({
           ? tabs.length - 1
           : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) %
             tabs.length;
-    chooseFormat(tabs[next].dataset.kind);
+    chooseFormat(tabs[next].dataset.kind!);
   });
   function dismissConfirmation() {
     confirmRequested = null;
@@ -978,7 +979,7 @@ export function mountYamlEditor({
       return;
     const generation = epoch,
       owner = adapter,
-      reference = selected,
+      reference = selected!,
       requested = { ...conversionRequest };
     let commitStarted = false;
     pending = true;
@@ -991,9 +992,9 @@ export function mountYamlEditor({
       return;
     }
     try {
-      const prepared = await owner.prepareRepresentation(snapshot, requested);
+      const prepared = await owner.prepareRepresentation!(snapshot!, requested);
       if (!current(generation, owner)) return;
-      const capability = formatOptions().get(selectedRepresentation);
+      const capability = formatOptions().get(selectedRepresentation!);
       if (
         !conversionRequest ||
         !capability ||
@@ -1013,7 +1014,7 @@ export function mountYamlEditor({
       showStatus(text.saving);
       render();
       closeDialog();
-      await owner.commitRepresentation(snapshot, prepared);
+      await owner.commitRepresentation!(snapshot!, prepared);
       if (!current(generation, owner)) return;
       try {
         focusDocumentReference({ vm, registry, readReference, reference });
@@ -1032,7 +1033,7 @@ export function mountYamlEditor({
             adapter = next;
             selected = reference;
             capture();
-            if (cause?.rollbackSucceeded === true) {
+            if (typeof cause === 'object' && cause !== null && 'rollbackSucceeded' in cause && cause.rollbackSucceeded === true) {
               conversionRequest = { ...requested };
               selectedRepresentation =
                 requested.direction === "to-source" ? "source" : requested.kind;
@@ -1056,7 +1057,7 @@ export function mountYamlEditor({
     }
   }
   const changeSourceLocation = () => {
-    sourceLocationDraft = {kind: sourceLocation.value, ...(sourceLocation.value === "url" ? {url: sourceURL.value} : {})};
+    sourceLocationDraft = {kind: sourceLocation.value as 'embedded-file' | 'url', ...(sourceLocation.value === "url" ? {url: sourceURL.value} : {})};
     preparedSourceLocation = null;
     draft = null;
     showStatus(text.sourceNeedsPreview);
@@ -1069,7 +1070,7 @@ export function mountYamlEditor({
     if (!sourceLocationDraft || !adapter?.prepareDataSource) return;
     const requested = {...sourceLocationDraft};
     void operate(async (generation, owner) => {
-      const candidate = await owner.prepareDataSource(snapshot, requested);
+      const candidate = await owner.prepareDataSource!(snapshot!, requested);
       if (!current(generation, owner) || JSON.stringify(requested) !== JSON.stringify(sourceLocationDraft)) return;
       preparedSourceLocation = candidate;
       draft = candidate.source;
@@ -1081,25 +1082,25 @@ export function mountYamlEditor({
     if (sourceLocationDraft || metadata()?.dataSource?.kind === "url") {
       if (sourceLocationDraft && !preparedSourceLocation) return;
       void operate(async (generation, owner) => {
-        const candidate = preparedSourceLocation || await owner.prepareDataSource(snapshot, {kind: "url", url: metadata().dataSource.url});
+        const candidate = preparedSourceLocation || await owner.prepareDataSource!(snapshot!, {kind: "url", url: metadata()!.dataSource!.url});
         if (!current(generation, owner)) return;
         commitLocked = true;
         render();
-        owner.commitDataSource(snapshot, candidate);
+        owner.commitDataSource!(snapshot!, candidate);
         if (current(generation, owner)) finishSaved();
       }, text.saveFailed);
       return;
     }
     if (conversionRequest) {
       if (pending || confirmation.open || !displayedPreviewMatches()) return;
-      const target = formatOptions().get(selectedRepresentation);
+      const target = formatOptions().get(selectedRepresentation!);
       if (!target || target.available === false) {
         render();
         return;
       }
       confirmRequested = { epoch, target: selectedRepresentation };
       confirmationMessage.textContent = text.confirmConversion(
-        formatLabel(selectedRepresentation),
+        formatLabel(selectedRepresentation!),
       );
       confirmation.showModal();
       confirmationCancel.focus();
@@ -1110,18 +1111,18 @@ export function mountYamlEditor({
       void operate(async (generation, owner) => {
         const active = metadata()?.activeRepresentation || "source";
         if (active === "source") {
-          const prepared = await owner.prepare(snapshot, previewReady.source);
+          const prepared = await owner.prepare(snapshot!, previewReady!.source);
           if (!current(generation, owner)) return;
           commitLocked = true;
           render();
-          await owner.commit(snapshot, prepared);
+          await owner.commit(snapshot!, prepared);
         } else {
           if (
             typeof owner.prepareRepresentation !== "function" ||
             typeof owner.commitRepresentation !== "function"
           )
             throw new Error(text.validationUnavailable);
-          const prepared = await owner.prepareRepresentation(snapshot, {
+          const prepared = await owner.prepareRepresentation!(snapshot!, {
             kind: active,
             direction: "from-source",
           });
@@ -1131,7 +1132,7 @@ export function mountYamlEditor({
           render();
           closeDialog();
           try {
-            await owner.commitRepresentation(snapshot, prepared);
+            await owner.commitRepresentation!(snapshot!, prepared);
           } catch (cause) {
             if (current(generation, owner) && !dialog.open) dialog.showModal();
             throw cause;
@@ -1147,11 +1148,11 @@ export function mountYamlEditor({
       showStatus(text.saving);
       const source = await readWorkcopy(generation, owner);
       if (!current(generation, owner) || source === null) return;
-      const prepared = await owner.prepare(snapshot, source);
+      const prepared = await owner.prepare(snapshot!, source);
       if (!current(generation, owner)) return;
       commitLocked = true;
       render();
-      await owner.commit(snapshot, prepared);
+      await owner.commit(snapshot!, prepared);
       if (current(generation, owner)) finishSaved();
     }, text.saveFailed);
   });
@@ -1201,14 +1202,14 @@ export function mountYamlEditor({
     getState: () => ({
       pending,
       commitLocked,
-      reference: selected && { ...selected },
-      session: session ? { id: session.id, revision: session.revision } : null,
+      reference: selected! && { ...selected },
+      session: session ? { id: session!.id, revision: session.revision } : null,
       hasDraft: draft !== null,
       hasConversionRequest: Boolean(conversionRequest),
       selectedRepresentation,
       confirmationOpen: confirmation.open,
       previewPending,
-      previewKind: displayedPreviewMatches() ? previewReady.kind : null,
+      previewKind: displayedPreviewMatches() ? previewReady!.kind : null,
       available: inspect().available,
     }),
     dispose() {
