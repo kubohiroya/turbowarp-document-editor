@@ -18,6 +18,14 @@ export function attachEmbeddedYamlHat({vm, registry, readReference, window: win,
         const target = vm.editingTarget;
         return Boolean(target && workspace.getBlockById(block.id) === block && target.blocks?.getBlock(block.id)?.opcode === block.type);
     };
+    // The registry lists the references it can open; an unlisted one (e.g. an unregistered provider) is shown disabled.
+    const listed = (block: HostObject, target: HostObject) => {
+        try {
+            const reference = readReference(block, target);
+            return registry.list().some(entry => entry.reference.providerId === reference.providerId && entry.reference.documentId === reference.documentId);
+        } catch { return false; }
+    };
+    const disabled = (block: HostObject, target: HostObject) => String(!canOpen() || !listed(block, target));
     function refreshDecorations() {
         if (disposed || !workspace || !blocks) return;
         const seen = new Set();
@@ -29,7 +37,7 @@ export function attachEmbeddedYamlHat({vm, registry, readReference, window: win,
             const previous = decorations.get(block.id);
             const target = vm.editingTarget;
             if (previous && previous.field === field && previous.target === target) {
-                field.fieldGroup_.setAttribute('aria-disabled', String(!canOpen()));
+                field.fieldGroup_.setAttribute('aria-disabled', disabled(block, target));
                 continue;
             }
             previous?.cleanup();
@@ -46,7 +54,7 @@ export function attachEmbeddedYamlHat({vm, registry, readReference, window: win,
                     catch (error) { onOpen({...anchor, error}); }
                 }});
             element.setAttribute('data-twpe-yaml-hat-icon', '');
-            element.setAttribute('aria-disabled', String(!canOpen()));
+            element.setAttribute('aria-disabled', disabled(block, target));
             decorations.set(block.id, {field, target, cleanup() {
                 unbind(); element.removeAttribute('data-twpe-yaml-hat-icon');
                 if (priorDisabled === null) element.removeAttribute('aria-disabled');

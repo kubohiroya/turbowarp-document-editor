@@ -818,14 +818,18 @@ export function mountYamlEditor({
   }
   async function activate(reference: DocumentReference) {
     if (disposed || pending || hasWork()) return;
-    let next: DocumentAdapter | undefined;
+    let next: DocumentAdapter | undefined, refusal: unknown;
     try {
       next = createEmbeddedYamlDocument(vm, reference, registry);
       const state = next.inspect();
-      if (!state.available) throw new Error(state.reason || text.unavailable);
+      if (!state.available) refusal = state.reason ? new Error(state.reason) : null;
     } catch (cause) {
+      refusal = cause;
+    }
+    // The registry or owner decides a refusal; the dialog shows its reason and writes nothing.
+    if (refusal !== undefined || !next) {
       next?.dispose();
-      showError(cause);
+      showError(refusal, text.unavailable);
       render();
       return;
     }
