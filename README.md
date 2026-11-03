@@ -24,14 +24,13 @@ import {
   registerDocumentSourceRootHatShape
 } from '@kubohiroya/turbowarp-document-editor';
 
-// Resolve once at host startup. Both flags are disabled by default.
+// Resolve once at host startup. The flag is disabled by default.
 const flags = readDocumentEditorFlags(location.search);
 registerDocumentSourceRootHatShape(Blockly);
 const editor = flags.embeddedYamlEditor ? mountDocumentEditor({
   vm,
   document,
   language: 'en',
-  documentSources: flags.documentSources,
   getScratch: () => ({vm, gui: {getBlockly: async () => Blockly}})
 }) : null;
 
@@ -39,7 +38,7 @@ const editor = flags.embeddedYamlEditor ? mountDocumentEditor({
 editor?.dispose();
 ```
 
-`twPlusYamlEditor=1` enables editing; `twPlusDocumentSource=1` enables source-location changes. The host resolves these flags once; project data cannot enable them. Register the disconnected root-hat shape even when editing is disabled.
+`twPlusYamlEditor=1` enables editing. The host resolves the flag once; project data cannot enable it. Source-location controls (file inside the SB3 or external URL) have no flag of their own: they appear for every document whose provider marks its location as editable. Register the disconnected root-hat shape even when editing is disabled.
 
 The package inserts its stylesheet once when mounted. Hosts that load CSS themselves can use `injectStyles: false` and `@kubohiroya/turbowarp-document-editor/style.css`.
 

@@ -152,13 +152,11 @@ export function mountYamlEditor({
   document: documentOption,
   fetch: fetchOption,
   language,
-  documentSources,
 }: DocumentEditorOptions) {
   if (!vm) throw new TypeError("An Editor VM is required.");
   const doc = documentOption || globalThis.document,
     win = doc.defaultView as HostWindow,
     fetcher = fetchOption || win.fetch.bind(win);
-  const sourcesEnabled = documentSources === true;
   const providers = getYamlEditorProviders(vm),
     registry = registryOption || providers.registry,
     readReference = readReferenceOption || providers.readReference;
@@ -595,7 +593,7 @@ export function mountYamlEditor({
     sourceName.textContent = snapshot?.sourceName || entry?.filename || "";
     heading.textContent = entry?.dialogTitle?.[String(locale).startsWith("ja") ? "ja" : "en"] || text.neutralTitle;
     const location = sourceLocationDraft || {kind: entry?.dataSource?.kind === "url" ? "url" : "embedded-file", url: entry?.dataSource?.url || ""};
-    sourceControls.hidden = !sourcesEnabled || !entry?.sourceLocationEditable;
+    sourceControls.hidden = !entry?.sourceLocationEditable;
     sourceLocation.value = location.kind;
     if (doc.activeElement !== sourceURL) sourceURL.value = location.url || "";
     sourceURL.hidden = location.kind !== "url";

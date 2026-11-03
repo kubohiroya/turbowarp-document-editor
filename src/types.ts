@@ -34,7 +34,6 @@ export interface DocumentEditorOptions {
   readReference?: (block: HostObject, target?: HostObject) => DocumentReference;
   fetch?: typeof fetch;
   language?: string;
-  documentSources?: boolean;
   injectStyles?: boolean;
 }
 export interface PreviewAttempt {owner: DocumentAdapter; snapshot: DocumentSnapshot; kind: string; source?: string;}
