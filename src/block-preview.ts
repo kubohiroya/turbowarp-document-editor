@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 import type {HostObject, HostWindow, ScratchHost} from './types.ts';
 // A separate read-only ScratchBlocks workspace; it never registers an extension with the VM.
-import {embeddedYamlRootHatShapeExtension, registerEmbeddedYamlRootHatShape} from '@kubohiroya/turbowarp-document-source';
+import {embeddedYamlRootHatShapeExtension, registerEmbeddedYamlRootHatShape, type EmbeddedYamlRootShapeHost} from '@kubohiroya/turbowarp-document-source';
 let serial = 0;
 const record = (value: unknown): value is HostObject => value !== null && typeof value === 'object' && !Array.isArray(value);
 const valueOf = (field: unknown) => Array.isArray(field) ? field[0] : record(field) ? field.value : field;
@@ -85,7 +85,7 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
     if (typeof Scratch?.gui?.getBlockly !== 'function') fail('The Editor does not provide ScratchBlocks.');
     const B = await Scratch.gui.getBlockly();
     cancelled();
-    registerEmbeddedYamlRootHatShape(B);
+    registerEmbeddedYamlRootHatShape(B as EmbeddedYamlRootShapeHost);
     const main = B.getMainWorkspace();
     if (!main) fail('The Editor workspace is unavailable.');
     const doc = container.ownerDocument, win = doc.defaultView!;
