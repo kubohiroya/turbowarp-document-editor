@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 import type {HostObject, ScratchHost} from './types.ts';
 interface RootShapeWindow {ScratchBlocks?: HostObject; Scratch?: {gui?: Partial<ScratchHost['gui']>}; setTimeout?(callback: () => void, delay: number): unknown;}
-import {registerEmbeddedYamlRootHatShape} from '@kubohiroya/turbowarp-document-source';
+import {registerEmbeddedYamlRootHatShape, type EmbeddedYamlRootShapeHost} from '@kubohiroya/turbowarp-document-source';
 
 // Stored root blocks must remain readable even when document editing is disabled.
 export async function initializeEmbeddedYamlRootShape({window: win = globalThis.window, timeoutMs = 30000}: {window?: RootShapeWindow; timeoutMs?: number} = {}) {
@@ -10,13 +10,13 @@ export async function initializeEmbeddedYamlRootShape({window: win = globalThis.
     while (true) {
         // The GUI publishes its block instance before project security approval creates Scratch.
         if (typeof win.ScratchBlocks?.Extensions?.register === 'function') {
-            registerEmbeddedYamlRootHatShape(win.ScratchBlocks);
+            registerEmbeddedYamlRootHatShape(win.ScratchBlocks as EmbeddedYamlRootShapeHost);
             return;
         }
         const gui = win.Scratch?.gui;
         if (typeof gui?.getBlockly === 'function') {
             const eager = typeof gui.getBlocklyEagerly === 'function' ? await gui.getBlocklyEagerly() : null;
-            registerEmbeddedYamlRootHatShape(eager || await gui.getBlockly());
+            registerEmbeddedYamlRootHatShape((eager || await gui.getBlockly()) as EmbeddedYamlRootShapeHost);
             return;
         }
         if (Date.now() >= deadline) throw new Error('The Editor block API did not become available.');
