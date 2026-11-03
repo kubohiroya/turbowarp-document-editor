@@ -48,10 +48,6 @@
       "types": "./dist/src/provider-bootstrap.d.ts",
       "default": "./dist/src/provider-bootstrap.js"
     },
-    "./feature-flags": {
-      "types": "./dist/src/feature-flags.d.ts",
-      "default": "./dist/src/feature-flags.js"
-    },
     "./host": {
       "types": "./dist/node/host.d.ts",
       "default": "./dist/node/host.js"

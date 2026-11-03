@@ -257,7 +257,7 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
         if (pathname === apiPrefix || pathname.startsWith(`${apiPrefix}/`)) return handleAPI(request, response, pathname);
         if (!['GET', 'HEAD'].includes(request.method || '')) throw failure(405, 'METHOD_NOT_ALLOWED', 'Use GET or HEAD for Editor files.');
         if (pathname === '/' || pathname === publicPath.slice(0, -1)) {
-            response.writeHead(302, {location: editorPath + '?twPlusYamlEditor=1'});
+            response.writeHead(302, {location: editorPath});
             response.end();
             return;
         }
@@ -281,7 +281,7 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
     });
     apiOrigin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     return Object.freeze({
-        url: `${apiOrigin}${editorPath}?twPlusYamlEditor=1`,
+        url: `${apiOrigin}${editorPath}`,
         apiOrigin, dataDirectory: storage,
         profileDirectory: profile.directory,
         userDataDirectory: profile.userDataDirectory,

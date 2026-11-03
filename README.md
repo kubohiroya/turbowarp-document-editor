@@ -20,25 +20,22 @@ This package does not depend on the GUI, distribution site, or Kamishibai App. A
 ```ts
 import {
   mountDocumentEditor,
-  readDocumentEditorFlags,
   registerDocumentSourceRootHatShape
 } from '@kubohiroya/turbowarp-document-editor';
 
-// Resolve once at host startup. The flag is disabled by default.
-const flags = readDocumentEditorFlags(location.search);
 registerDocumentSourceRootHatShape(Blockly);
-const editor = flags.embeddedYamlEditor ? mountDocumentEditor({
+const editor = mountDocumentEditor({
   vm,
   document,
   language: 'en',
   getScratch: () => ({vm, gui: {getBlockly: async () => Blockly}})
-}) : null;
+});
 
 // Dispose when the host unmounts or replaces its VM.
-editor?.dispose();
+editor.dispose();
 ```
 
-`twPlusYamlEditor=1` enables editing. The host resolves the flag once; project data cannot enable it. Source-location controls (file inside the SB3 or external URL) have no flag of their own: they appear for every document whose provider marks its location as editable. Register the disconnected root-hat shape even when editing is disabled.
+There is no startup switch. What appears is decided by the registered providers: a hat gets its file icon when a provider owns its document, and source-location controls (file inside the SB3 or external URL) appear for documents whose provider marks their location as editable. A project without such a provider looks exactly as in upstream TurboWarp.
 
 The package inserts its stylesheet once when mounted. Hosts that load CSS themselves can use `injectStyles: false` and `@kubohiroya/turbowarp-document-editor/style.css`.
 
