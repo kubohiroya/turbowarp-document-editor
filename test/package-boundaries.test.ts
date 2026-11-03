@@ -3,15 +3,11 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {build} from 'esbuild';
-import {readDocumentEditorFlags, documentEditorStyles} from '../src/index.ts';
+import * as entry from '../src/index.ts';
+const {documentEditorStyles} = entry;
 
-test('startup controls are immutable, explicit and default off', () => {
-    for (const value of ['', '?twPlusYamlEditor=true', '?twPlusDocumentSource=1']) {
-        assert.deepEqual(readDocumentEditorFlags(value), {embeddedYamlEditor: false});
-    }
-    const flags = readDocumentEditorFlags('?twPlusYamlEditor=1');
-    assert(Object.isFrozen(flags));
-    assert.deepEqual(flags, {embeddedYamlEditor: true});
+test('the package has no startup switch: a host mounts the editor and providers decide what appears', () => {
+    assert.equal('readDocumentEditorFlags' in entry, false);
 });
 
 test('the browser entry is host-independent and the injected CSS equals the optional stylesheet', async () => {

@@ -59,7 +59,7 @@ test('serves the local Editor and a same-origin config without putting a token i
     assert.equal(privateSettings['extensions.autoUpdate'], 'off');
     assert.equal(privateSettings['telemetry.telemetryLevel'], 'off');
     assert.equal(f.config.maxSourceBytes, maxSourceBytes);
-    assert.equal(new URL(f.host.url).searchParams.get('twPlusYamlEditor'), '1');
+    assert.equal(new URL(f.host.url).search, '');
     assert.ok(!f.host.url.includes(f.config.token));
     const html = await fetch(f.host.url);
     assert.equal(html.status, 200);
@@ -377,7 +377,7 @@ test('the companion serves a plain GUI at root and supports an injected distribu
     assert.equal(new URL(root.host.url).pathname, '/editor.html');
     assert.equal((await fetch(root.host.url)).status, 200);
     const redirect = await fetch(root.host.apiOrigin + '/', {redirect: 'manual'});
-    assert.equal(redirect.headers.get('location'), '/editor.html?twPlusYamlEditor=1');
+    assert.equal(redirect.headers.get('location'), '/editor.html');
     assert.equal((await fetch(root.host.apiOrigin + '/app.js')).status, 200);
     const other = await fixture(t, {publicPath: '/custom-gui/', editorPath: '/custom-gui/editor.html'});
     assert.equal((await fetch(other.host.url)).status, 200);

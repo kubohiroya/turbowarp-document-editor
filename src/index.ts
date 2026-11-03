@@ -5,7 +5,6 @@ import {mountYamlEditor} from './client.ts';
 import {documentEditorStyles} from './styles.ts';
 export {documentEditorStyles};
 export {registerDocumentSourceRootHatShape} from '@kubohiroya/turbowarp-document-source';
-export {readYamlEditorFlags as readDocumentEditorFlags} from './feature-flags.ts';
 
 export function mountDocumentEditor(options: DocumentEditorOptions) {
     const doc = options.document || globalThis.document;

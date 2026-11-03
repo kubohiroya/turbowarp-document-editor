@@ -23,7 +23,7 @@ independent implementation. Earlier GPL grants are not revoked.
 | `src/client.ts` | `site/yaml-editor/client.js` | [2ceb7d4f66](https://github.com/kubohiroya/turbowarp-plus-editor/commit/2ceb7d4f66456220e84416eb54042a31d68d835d) |
 | `src/dialog-window.ts` | `site/yaml-editor/dialog-window.js` | [95bb215cdc](https://github.com/kubohiroya/turbowarp-plus-editor/commit/95bb215cdcfd5b9d35fb4f23b886df384773c5f5) |
 | `src/document.ts` | `site/yaml-editor/document.js` | [2ceb7d4f66](https://github.com/kubohiroya/turbowarp-plus-editor/commit/2ceb7d4f66456220e84416eb54042a31d68d835d) |
-| `src/feature-flags.ts` | `site/yaml-editor/feature-flags.js` | [2ceb7d4f66](https://github.com/kubohiroya/turbowarp-plus-editor/commit/2ceb7d4f66456220e84416eb54042a31d68d835d) |
+| `src/feature-flags.ts` (removed in 0.1.0-rc.4) | `site/yaml-editor/feature-flags.js` | [2ceb7d4f66](https://github.com/kubohiroya/turbowarp-plus-editor/commit/2ceb7d4f66456220e84416eb54042a31d68d835d) |
 | `src/focus-document.ts` | `site/yaml-editor/focus-document.js` | [2ceb7d4f66](https://github.com/kubohiroya/turbowarp-plus-editor/commit/2ceb7d4f66456220e84416eb54042a31d68d835d) |
 | `src/hat-entry.ts` | `site/yaml-editor/hat-entry.js` | [2ceb7d4f66](https://github.com/kubohiroya/turbowarp-plus-editor/commit/2ceb7d4f66456220e84416eb54042a31d68d835d) |
 | `src/provider-bootstrap.ts` | `site/yaml-editor/provider-bootstrap.js` | [2ceb7d4f66](https://github.com/kubohiroya/turbowarp-plus-editor/commit/2ceb7d4f66456220e84416eb54042a31d68d835d) |
