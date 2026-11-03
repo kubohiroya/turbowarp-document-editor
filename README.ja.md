@@ -19,21 +19,20 @@ TurboWarpのデータソースを編集する共通UIと、ローカル外部エ
 import {mountDocumentEditor, readDocumentEditorFlags,
     registerDocumentSourceRootHatShape} from '@kubohiroya/turbowarp-document-editor';
 
-// Read once during startup. Both flags are off by default.
+// Read once during startup. The flag is off by default.
 const flags = readDocumentEditorFlags(location.search);
 registerDocumentSourceRootHatShape(Blockly);
 const editor = flags.embeddedYamlEditor ? mountDocumentEditor({
     vm,
     document,
     language: 'ja',
-    documentSources: flags.documentSources,
     getScratch: () => ({vm, gui: {getBlockly: async () => Blockly}})
 }) : null;
 // Dispose when the host is unmounted or its VM is replaced.
 // editor?.dispose();
 ```
 
-`twPlusYamlEditor=1`で編集UIを、`twPlusDocumentSource=1`で参照元変更を有効にします。GUIは起動時に固定し、SB3から有効化しません。ルートハットの接続不可の形はフラグOFFでも登録します。
+`twPlusYamlEditor=1`で編集UIを有効にします。GUIは起動時に固定し、SB3から有効化しません。参照元（SB3内のファイル・外部URL）の操作には専用のフラグがなく、提供元が参照元を変更できるとした文書では常に出ます。ルートハットの接続不可の形はフラグOFFでも登録します。
 
 スタイルはマウント時に一度挿入します。ホストがCSSを別途読み込む場合は `injectStyles: false` と `@kubohiroya/turbowarp-document-editor/style.css` を使用できます。Webpack 4では `@kubohiroya/turbowarp-document-editor/webpack4` の `withDocumentEditorWebpack4(config)` でサブパスの解決とホストのBabel対象を追加します。
 

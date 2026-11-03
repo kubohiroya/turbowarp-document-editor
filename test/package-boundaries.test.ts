@@ -6,12 +6,12 @@ import {build} from 'esbuild';
 import {readDocumentEditorFlags, documentEditorStyles} from '../src/index.ts';
 
 test('startup controls are immutable, explicit and default off', () => {
-    for (const value of ['', '?twPlusYamlEditor=true', '?twPlusDocumentSource=0']) {
-        assert.deepEqual(readDocumentEditorFlags(value), {embeddedYamlEditor: false, documentSources: false});
+    for (const value of ['', '?twPlusYamlEditor=true', '?twPlusDocumentSource=1']) {
+        assert.deepEqual(readDocumentEditorFlags(value), {embeddedYamlEditor: false});
     }
-    const flags = readDocumentEditorFlags('?twPlusYamlEditor=1&twPlusDocumentSource=1');
+    const flags = readDocumentEditorFlags('?twPlusYamlEditor=1');
     assert(Object.isFrozen(flags));
-    assert.deepEqual(flags, {embeddedYamlEditor: true, documentSources: true});
+    assert.deepEqual(flags, {embeddedYamlEditor: true});
 });
 
 test('the browser entry is host-independent and the injected CSS equals the optional stylesheet', async () => {

@@ -40,7 +40,7 @@ const block={id,type:blockData[id].opcode,isInFlyout:false,isShadow:()=>false,is
 const workspace={options:{readOnly:false},getAllBlocks:()=>[block],getBlockById:other=>other===id?block:null,isDragging:()=>false,addChangeListener(){},removeChangeListener(){}};
 const blockly={FieldImage,getMainWorkspace:()=>workspace,Extensions:{register(){}}};
 window.Scratch={vm,gui:{getBlockly:async()=>blockly}};
-window.fixture={vm,project,calls,ui:mountDocumentEditor({vm,document,documentSources:true,language:new URLSearchParams(location.search).get('lang')||'ja'})};
+window.fixture={vm,project,calls,ui:mountDocumentEditor({vm,document,language:new URLSearchParams(location.search).get('lang')||'ja'})};
 `;
 const page$ = '<!doctype html><html lang="ja"><head><meta charset="utf-8"></head><body><h1>データソースのローカル操作検証</h1><svg width="500" height="80"><g id="hat"><rect x="10" y="10" width="300" height="60" rx="15" fill="#8a6230"/><text x="30" y="45" fill="white">データソース settings.yml</text></g></svg><script type="module" src="/fixture.js"></script></body></html>';
 
@@ -64,7 +64,7 @@ test('test-only owner: URL preview/cancel/save, fresh reload and embedded import
             } catch {res.writeHead(404); res.end();}
         });
         await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve));
-        const url = 'http://127.0.0.1:' + (server.address() as AddressInfo).port + '/?twPlusDocumentSource=1';
+        const url = 'http://127.0.0.1:' + (server.address() as AddressInfo).port + '/';
         const executablePath = process.env.TWPE_CHROME_EXECUTABLE || process.env.CHROME_PATH;
         browser = await chromium.launch({headless: true, ...(executablePath ? {executablePath} : {})});
         const page: Page = await browser.newPage({viewport: {width: 1280, height: 900}}), errors: string[] = [];
