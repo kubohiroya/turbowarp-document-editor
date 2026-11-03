@@ -114,7 +114,7 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-css.ts",
     "typecheck": "tsc -p tsconfig.test.json",
     "test": "node --test test/*.test.ts",
-    "test:browser": "node --test test/yaml-ui.browser.ts",
+    "test:browser": "node --test test/*.browser.ts",
     "prepare": "npm run build",
     "pack:check": "npm pack --dry-run"
   },
