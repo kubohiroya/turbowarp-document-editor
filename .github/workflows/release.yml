@@ -37,9 +37,11 @@ jobs:
         # token instead of exchanging the workflow identity, so publishing fails with
         # "OIDC permission denied".
       - run: npm ci --ignore-scripts
-      - run: npm run typecheck
-      # dist/ is what the archive ships; the browser tests stay in ci.yml, which ran on this commit.
+      # dist/ is what the archive ships, and the tests type-check against it (package-boundaries
+      # imports ../dist/webpack4.cjs), so it is built first. ci.yml gets the same order from the
+      # prepare script. The browser tests stay in ci.yml, which ran on this commit.
       - run: npm run build
+      - run: npm run typecheck
       - run: npm test
       - name: Check the tag names the package version
         run: |
