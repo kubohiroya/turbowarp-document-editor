@@ -151,7 +151,7 @@ const messages = {
 };
 
 let nextPanelId = 0;
-type PanelMount = {element: HTMLElement; close(): void};
+type PanelMount = {element: HTMLElement; close(): void; externalFile?: boolean};
 
 export function mountYamlEditor({
   vm,
@@ -162,6 +162,7 @@ export function mountYamlEditor({
   fetch: fetchOption,
   language,
   openPanel,
+  projectTransfer,
 }: DocumentEditorOptions, docked?: PanelMount) {
   if (!vm) throw new TypeError("An Editor VM is required.");
   const doc = documentOption || globalThis.document,
@@ -174,7 +175,9 @@ export function mountYamlEditor({
     language ||
     new URLSearchParams(win.location.search).get("lang") ||
     doc.documentElement.lang;
-  const text = messages[String(locale).startsWith("ja") ? "ja" : "en"];
+  const japanese = String(locale).startsWith("ja");
+  const text = messages[japanese ? "ja" : "en"];
+  const externalFile = docked?.externalFile === true;
   const id = (value: string) => docked ? `${value}-${panelId}` : value;
   const panelId = docked ? ++nextPanelId : 0;
   const dialog = doc.createElement("dialog");
@@ -237,6 +240,12 @@ export function mountYamlEditor({
   const editButton = button(text.edit);
   editButton.className = "twpe-yaml-external-edit";
   actions.append(docsLink, schemaLink);
+  const copyTransfer = projectTransfer && button(japanese ? "YAML をコピー／ドラッグ" : "Copy or drag YAML");
+  const pasteTransfer = projectTransfer && button(japanese ? "YAML を貼り付け" : "Paste YAML");
+  if (copyTransfer && pasteTransfer) {
+    copyTransfer.draggable = true;
+    actions.append(copyTransfer, pasteTransfer);
+  }
   const conversions = doc.createElement("section");
   conversions.setAttribute("aria-label", text.convert);
   const activeNote = paragraph(),
@@ -606,12 +615,12 @@ export function mountYamlEditor({
     );
     selection.value =
       selected && optionReferences.has(key(selected)) ? key(selected) : "";
-    const inlineDraft = Boolean(docked && draft !== null && !sourceLocationDraft && !session);
+    const inlineDraft = Boolean((docked || projectTransfer) && draft !== null && !sourceLocationDraft && !session);
     selectionRow.hidden = Boolean(docked) || listed.length < 2;
     selection.disabled = pending || hasWork();
     switchHint.hidden = Boolean(docked) || !hasWork() || listed.length < 2;
     sourceName.textContent = snapshot?.sourceName || entry?.filename || "";
-    heading.textContent = entry?.dialogTitle?.[String(locale).startsWith("ja") ? "ja" : "en"] || text.neutralTitle;
+    heading.textContent = externalFile ? (japanese ? "外部YAMLファイル" : "External YAML file") : entry?.dialogTitle?.[String(locale).startsWith("ja") ? "ja" : "en"] || text.neutralTitle;
     const location = sourceLocationDraft || {kind: entry?.dataSource?.kind === "url" ? "url" : "embedded-file", url: entry?.dataSource?.url || ""};
     sourceControls.hidden = !entry?.sourceLocationEditable;
     sourceLocation.value = location.kind;
@@ -621,7 +630,7 @@ export function mountYamlEditor({
     sourceURL.disabled = sourceLocation.disabled;
     sourceLoad.disabled = sourceLocation.disabled || !sourceLocationDraft;
     sourceHint.hidden = entry?.dataSource?.kind !== "url" && location.kind !== "url";
-    saveButton.textContent = sourceLocationDraft || entry?.dataSource?.kind === "url" ? text.sourceSave : text.save;
+    saveButton.textContent = externalFile ? (japanese ? "保存" : "Save") : sourceLocationDraft || entry?.dataSource?.kind === "url" ? text.sourceSave : text.save;
     for (const [link, value] of [[docsLink, entry?.docsURL], [schemaLink, entry?.schema?.id]] as const) {
       let url = null;
       try {
@@ -633,6 +642,7 @@ export function mountYamlEditor({
       if (url) link.href = url;
       else link.removeAttribute("href");
     }
+    editButton.hidden = externalFile;
     editButton.disabled =
       pending ||
       !availability.available ||
@@ -646,6 +656,7 @@ export function mountYamlEditor({
     saveButton.disabled =
       pending ||
       !availability.available ||
+      (externalFile && draft === null) ||
       (!hasWork() && Boolean(error.textContent)) ||
       !displayedPreviewMatches() ||
       (Boolean(sourceLocationDraft) && !preparedSourceLocation);
@@ -709,6 +720,10 @@ export function mountYamlEditor({
     blockPreview.hidden = selectedRepresentation === "source";
     previewLoading.hidden = !previewPending;
     editButton.disabled ||= selectedRepresentation !== "source";
+    if (copyTransfer && pasteTransfer) {
+      copyTransfer.hidden = pasteTransfer.hidden = !embeddedYaml(entry);
+      copyTransfer.disabled = pasteTransfer.disabled = !canTransfer();
+    }
     if (replacementNotice) showStatus(text.replaced);
     else if (adapter && !availability.available && !pending && !converting)
       status.textContent = `${text.unavailable}${availability.reason ? ` ${availability.reason}` : ""}`;
@@ -802,6 +817,12 @@ export function mountYamlEditor({
     else restoreFocus();
   }
   function finishSaved() {
+    if (externalFile && !closing) {
+      capture();
+      showStatus(japanese ? "元のYAMLファイルに保存しました。" : "Saved to the original YAML file.");
+      render();
+      return;
+    }
     clearWork();
     error.textContent = "";
     replacementNotice = false;
@@ -812,7 +833,7 @@ export function mountYamlEditor({
     else restoreFocus();
   }
   function invalidate() {
-    if (disposed || converting) return;
+    if (disposed || converting || externalFile) return;
     if (docked) return docked.close();
     const editing = Boolean(snapshot || session || conversionRequest);
     clearWork();
@@ -839,6 +860,7 @@ export function mountYamlEditor({
       if (current(generation, owner)) {
         pending = false;
         commitLocked = false;
+        if (externalFile) closing = false;
         render();
       }
     }
@@ -897,17 +919,86 @@ export function mountYamlEditor({
     showStatus(text.ready);
     render();
   }
+  function embeddedYaml(entry: ReturnType<typeof metadata>) {
+    return Boolean(entry && entry.format !== "json" &&
+      (entry.format === "yaml" || /\.ya?ml$/i.test(entry.filename)) && entry.dataSource?.kind !== "url");
+  }
+  function canTransfer() {
+    const entry = metadata();
+    return Boolean(!disposed && dialog.open && !pending && !session && !sourceLocationDraft && !conversionRequest &&
+      embeddedYaml(entry) && (!entry?.activeRepresentation || entry.activeRepresentation === "source") &&
+      selectedRepresentation === "source" && displayedPreviewMatches() && inspect().available);
+  }
+  function transferJSON(source: string) {
+    return JSON.stringify({format: "turbowarp-yaml", version: 1, source});
+  }
+  function importTransfer(read: () => string | null | Promise<string | null>) {
+    if (!canTransfer() || !snapshot) return;
+    const saved = snapshot;
+    void operate(async (generation, owner) => {
+      const raw = await read();
+      if (raw === null || !current(generation, owner)) return;
+      const value = JSON.parse(raw);
+      if (value?.format !== "turbowarp-yaml" || value.version !== 1 || typeof value.source !== "string") {
+        throw new Error(japanese ? "作品間転送用の YAML 形式が無効です" : "Invalid YAML transfer");
+      }
+      if (new TextEncoder().encode(value.source).byteLength > 4194304) throw new Error(text.tooLarge);
+      await owner.prepare(saved, value.source);
+      if (!current(generation, owner) || !previewReady) return;
+      draft = value.source === saved.source ? null : value.source;
+      previewReady.source = draft ?? saved.source;
+      preview.value = previewReady.source;
+      showStatus(text.ready);
+    });
+  }
+  if (projectTransfer && copyTransfer && pasteTransfer) {
+    copyTransfer.addEventListener("click", () => {
+      if (!canTransfer() || !previewReady) return;
+      const source = previewReady.source;
+      void projectTransfer.copy(transferJSON(source), source).catch(cause => showError(cause));
+    });
+    pasteTransfer.addEventListener("click", () => importTransfer(() => projectTransfer.read()));
+    copyTransfer.addEventListener("dragstart", event => {
+      if (!event.isTrusted || !canTransfer() || !previewReady || !event.dataTransfer) {
+        event.preventDefault();
+        return;
+      }
+      try {
+        projectTransfer.drag(event.dataTransfer, transferJSON(previewReady.source));
+      } catch (cause) {
+        event.preventDefault();
+        showError(cause);
+      }
+    });
+    sourcePreview.addEventListener("dragover", event => {
+      if (event.isTrusted && event.dataTransfer && canTransfer() && projectTransfer.accepts(event.dataTransfer)) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      }
+    });
+    sourcePreview.addEventListener("drop", event => {
+      if (!event.isTrusted || !event.dataTransfer || !canTransfer()) return;
+      try {
+        const raw = projectTransfer.drop(event.dataTransfer);
+        if (raw === null) return;
+        event.preventDefault();
+        event.stopPropagation();
+        importTransfer(() => raw);
+      } catch (cause) {
+        showError(cause);
+      }
+    });
+  }
   function getPanelRequest(reference: DocumentReference) {
     if (disposed || docked) return;
     const entry = entries().find(item => same(item.reference, reference));
-    if (entry && entry.format !== "json" &&
-        (entry.format === "yaml" || /\.ya?ml$/i.test(entry.filename)) &&
-        entry.dataSource?.kind !== "url") {
+    if (entry && embeddedYaml(entry)) {
       return {
           reference,
           filename: entry.filename,
           mount(element: HTMLElement, close: () => void) {
-            const editor = mountYamlEditor({vm, getScratch, registry, readReference, document: doc, fetch: fetcher, language: locale},
+            const editor = mountYamlEditor({vm, getScratch, registry, readReference, document: doc, fetch: fetcher, language: locale,
+              projectTransfer},
               {element, close});
             void editor.open(reference);
             return editor;
@@ -1041,6 +1132,7 @@ export function mountYamlEditor({
   confirmationOK.addEventListener("click", () => {
     if (closing) {
       dismissConfirmation();
+      if (externalFile) closing = true;
       saveButton.click();
       return;
     }
@@ -1245,7 +1337,13 @@ export function mountYamlEditor({
       await readWorkcopy(generation, owner);
     });
   };
-  win.addEventListener("focus", refreshExternalPreview);
+  const protectDraft = (event: BeforeUnloadEvent) => {
+    if (!hasWork() && !commitLocked) return;
+    event.preventDefault();
+    event.returnValue = "";
+  };
+  if (externalFile) win.addEventListener("beforeunload", protectDraft);
+  else win.addEventListener("focus", refreshExternalPreview);
   const projectEvents = typeof vm.runtime?.on === "function" ? vm.runtime : vm;
   projectEvents.on?.("PROJECT_LOADED", invalidate);
   vm.runtime?.on?.("RUNTIME_DISPOSED", invalidate);
@@ -1264,7 +1362,7 @@ export function mountYamlEditor({
     onError: (cause) =>
       console.error("Could not attach the document hat icon.", cause),
   });
-  const ready = request("/config")
+  const ready = externalFile ? Promise.resolve() : request("/config")
     .then((config) => {
       if (disposed) return;
       if (config.available !== true || typeof config.token !== "string")
@@ -1309,6 +1407,7 @@ export function mountYamlEditor({
       disposed = true;
       unsubscribe();
       win.removeEventListener("focus", refreshExternalPreview);
+      win.removeEventListener("beforeunload", protectDraft);
       projectEvents.off?.("PROJECT_LOADED", invalidate);
       vm.runtime?.off?.("RUNTIME_DISPOSED", invalidate);
       hatEntry?.dispose();
