@@ -16,3 +16,5 @@ export function mountDocumentEditor(options: DocumentEditorOptions) {
     }
     return mountYamlEditor(options);
 }
+
+export {createExternalYamlMenuAction, type ExternalYamlFilePort} from './external-yaml.ts';

@@ -151,7 +151,7 @@ const messages = {
 };
 
 let nextPanelId = 0;
-type PanelMount = {element: HTMLElement; close(): void};
+type PanelMount = {element: HTMLElement; close(): void; externalFile?: boolean};
 
 export function mountYamlEditor({
   vm,
@@ -175,7 +175,9 @@ export function mountYamlEditor({
     language ||
     new URLSearchParams(win.location.search).get("lang") ||
     doc.documentElement.lang;
-  const text = messages[String(locale).startsWith("ja") ? "ja" : "en"];
+  const japanese = String(locale).startsWith("ja");
+  const text = messages[japanese ? "ja" : "en"];
+  const externalFile = docked?.externalFile === true;
   const id = (value: string) => docked ? `${value}-${panelId}` : value;
   const panelId = docked ? ++nextPanelId : 0;
   const dialog = doc.createElement("dialog");
@@ -238,7 +240,6 @@ export function mountYamlEditor({
   const editButton = button(text.edit);
   editButton.className = "twpe-yaml-external-edit";
   actions.append(docsLink, schemaLink);
-  const japanese = String(locale).startsWith("ja");
   const copyTransfer = projectTransfer && button(japanese ? "YAML をコピー／ドラッグ" : "Copy or drag YAML");
   const pasteTransfer = projectTransfer && button(japanese ? "YAML を貼り付け" : "Paste YAML");
   if (copyTransfer && pasteTransfer) {
@@ -619,7 +620,7 @@ export function mountYamlEditor({
     selection.disabled = pending || hasWork();
     switchHint.hidden = Boolean(docked) || !hasWork() || listed.length < 2;
     sourceName.textContent = snapshot?.sourceName || entry?.filename || "";
-    heading.textContent = entry?.dialogTitle?.[String(locale).startsWith("ja") ? "ja" : "en"] || text.neutralTitle;
+    heading.textContent = externalFile ? (japanese ? "外部YAMLファイル" : "External YAML file") : entry?.dialogTitle?.[String(locale).startsWith("ja") ? "ja" : "en"] || text.neutralTitle;
     const location = sourceLocationDraft || {kind: entry?.dataSource?.kind === "url" ? "url" : "embedded-file", url: entry?.dataSource?.url || ""};
     sourceControls.hidden = !entry?.sourceLocationEditable;
     sourceLocation.value = location.kind;
@@ -629,7 +630,7 @@ export function mountYamlEditor({
     sourceURL.disabled = sourceLocation.disabled;
     sourceLoad.disabled = sourceLocation.disabled || !sourceLocationDraft;
     sourceHint.hidden = entry?.dataSource?.kind !== "url" && location.kind !== "url";
-    saveButton.textContent = sourceLocationDraft || entry?.dataSource?.kind === "url" ? text.sourceSave : text.save;
+    saveButton.textContent = externalFile ? (japanese ? "保存" : "Save") : sourceLocationDraft || entry?.dataSource?.kind === "url" ? text.sourceSave : text.save;
     for (const [link, value] of [[docsLink, entry?.docsURL], [schemaLink, entry?.schema?.id]] as const) {
       let url = null;
       try {
@@ -641,6 +642,7 @@ export function mountYamlEditor({
       if (url) link.href = url;
       else link.removeAttribute("href");
     }
+    editButton.hidden = externalFile;
     editButton.disabled =
       pending ||
       !availability.available ||
@@ -654,6 +656,7 @@ export function mountYamlEditor({
     saveButton.disabled =
       pending ||
       !availability.available ||
+      (externalFile && draft === null) ||
       (!hasWork() && Boolean(error.textContent)) ||
       !displayedPreviewMatches() ||
       (Boolean(sourceLocationDraft) && !preparedSourceLocation);
@@ -814,6 +817,12 @@ export function mountYamlEditor({
     else restoreFocus();
   }
   function finishSaved() {
+    if (externalFile && !closing) {
+      capture();
+      showStatus(japanese ? "元のYAMLファイルに保存しました。" : "Saved to the original YAML file.");
+      render();
+      return;
+    }
     clearWork();
     error.textContent = "";
     replacementNotice = false;
@@ -824,7 +833,7 @@ export function mountYamlEditor({
     else restoreFocus();
   }
   function invalidate() {
-    if (disposed || converting) return;
+    if (disposed || converting || externalFile) return;
     if (docked) return docked.close();
     const editing = Boolean(snapshot || session || conversionRequest);
     clearWork();
@@ -851,6 +860,7 @@ export function mountYamlEditor({
       if (current(generation, owner)) {
         pending = false;
         commitLocked = false;
+        if (externalFile) closing = false;
         render();
       }
     }
@@ -1122,6 +1132,7 @@ export function mountYamlEditor({
   confirmationOK.addEventListener("click", () => {
     if (closing) {
       dismissConfirmation();
+      if (externalFile) closing = true;
       saveButton.click();
       return;
     }
@@ -1326,7 +1337,13 @@ export function mountYamlEditor({
       await readWorkcopy(generation, owner);
     });
   };
-  win.addEventListener("focus", refreshExternalPreview);
+  const protectDraft = (event: BeforeUnloadEvent) => {
+    if (!hasWork() && !commitLocked) return;
+    event.preventDefault();
+    event.returnValue = "";
+  };
+  if (externalFile) win.addEventListener("beforeunload", protectDraft);
+  else win.addEventListener("focus", refreshExternalPreview);
   const projectEvents = typeof vm.runtime?.on === "function" ? vm.runtime : vm;
   projectEvents.on?.("PROJECT_LOADED", invalidate);
   vm.runtime?.on?.("RUNTIME_DISPOSED", invalidate);
@@ -1345,7 +1362,7 @@ export function mountYamlEditor({
     onError: (cause) =>
       console.error("Could not attach the document hat icon.", cause),
   });
-  const ready = request("/config")
+  const ready = externalFile ? Promise.resolve() : request("/config")
     .then((config) => {
       if (disposed) return;
       if (config.available !== true || typeof config.token !== "string")
@@ -1390,6 +1407,7 @@ export function mountYamlEditor({
       disposed = true;
       unsubscribe();
       win.removeEventListener("focus", refreshExternalPreview);
+      win.removeEventListener("beforeunload", protectDraft);
       projectEvents.off?.("PROJECT_LOADED", invalidate);
       vm.runtime?.off?.("RUNTIME_DISPOSED", invalidate);
       hatEntry?.dispose();
