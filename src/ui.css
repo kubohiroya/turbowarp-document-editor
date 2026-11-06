@@ -73,3 +73,19 @@
 .twpe-source-controls input:focus-visible { outline:3px solid #007fa8; outline-offset:2px; }
 
 .twpe-yaml-content .twpe-yaml-source-preview:not([hidden]) { display:flex; flex:1 0 auto; min-height:0; }
+
+.twpe-yaml-window[data-twpe-document-pane][open] {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 12px;
+    border: 0;
+    border-radius: 0;
+}
+.twpe-yaml-dialog[data-twpe-document-pane] .twpe-yaml-titlebar { cursor: default; touch-action: auto; }
+.twpe-yaml-dialog[data-twpe-document-pane] .twpe-yaml-maximize { display: none; }
+.twpe-yaml-confirmation [hidden] { display: none; }
