@@ -897,22 +897,28 @@ export function mountYamlEditor({
     showStatus(text.ready);
     render();
   }
-  async function openFromHat(anchor: {element: HTMLElement | SVGElement; reference?: DocumentReference; error?: unknown}) {
-    if (disposed || pending || dialog.open) return;
-    const reference = anchor.reference;
-    const entry = reference && entries().find(item => same(item.reference, reference));
-    if (!anchor.error && reference && entry && entry.format !== "json" &&
+  function getPanelRequest(reference: DocumentReference) {
+    if (disposed || docked) return;
+    const entry = entries().find(item => same(item.reference, reference));
+    if (entry && entry.format !== "json" &&
         (entry.format === "yaml" || /\.ya?ml$/i.test(entry.filename)) &&
-        entry.dataSource?.kind !== "url" && openPanel?.({
+        entry.dataSource?.kind !== "url") {
+      return {
           reference,
           filename: entry.filename,
-          mount(element, close) {
+          mount(element: HTMLElement, close: () => void) {
             const editor = mountYamlEditor({vm, getScratch, registry, readReference, document: doc, fetch: fetcher, language: locale},
               {element, close});
             void editor.open(reference);
             return editor;
           },
-        })) return;
+      };
+    }
+  }
+  async function openFromHat(anchor: {element: HTMLElement | SVGElement; reference?: DocumentReference; error?: unknown}) {
+    if (disposed || pending || dialog.open) return;
+    const request = !anchor.error && anchor.reference && getPanelRequest(anchor.reference);
+    if (request && openPanel?.(request)) return;
     opener = anchor.element;
     error.textContent = "";
     showDialog();
@@ -1273,6 +1279,8 @@ export function mountYamlEditor({
     dialog,
     ready,
     requestClose,
+    getPanelRequest,
+    subscribePanelRequests: (listener: () => void) => registry.subscribe(listener),
     async open(reference: DocumentReference) {
       if (disposed || dialog.open) return;
       showDialog();
