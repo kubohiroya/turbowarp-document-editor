@@ -162,6 +162,7 @@ export function mountYamlEditor({
   fetch: fetchOption,
   language,
   openPanel,
+  projectTransfer,
 }: DocumentEditorOptions, docked?: PanelMount) {
   if (!vm) throw new TypeError("An Editor VM is required.");
   const doc = documentOption || globalThis.document,
@@ -237,6 +238,13 @@ export function mountYamlEditor({
   const editButton = button(text.edit);
   editButton.className = "twpe-yaml-external-edit";
   actions.append(docsLink, schemaLink);
+  const japanese = String(locale).startsWith("ja");
+  const copyTransfer = projectTransfer && button(japanese ? "YAML をコピー／ドラッグ" : "Copy or drag YAML");
+  const pasteTransfer = projectTransfer && button(japanese ? "YAML を貼り付け" : "Paste YAML");
+  if (copyTransfer && pasteTransfer) {
+    copyTransfer.draggable = true;
+    actions.append(copyTransfer, pasteTransfer);
+  }
   const conversions = doc.createElement("section");
   conversions.setAttribute("aria-label", text.convert);
   const activeNote = paragraph(),
@@ -606,7 +614,7 @@ export function mountYamlEditor({
     );
     selection.value =
       selected && optionReferences.has(key(selected)) ? key(selected) : "";
-    const inlineDraft = Boolean(docked && draft !== null && !sourceLocationDraft && !session);
+    const inlineDraft = Boolean((docked || projectTransfer) && draft !== null && !sourceLocationDraft && !session);
     selectionRow.hidden = Boolean(docked) || listed.length < 2;
     selection.disabled = pending || hasWork();
     switchHint.hidden = Boolean(docked) || !hasWork() || listed.length < 2;
@@ -709,6 +717,10 @@ export function mountYamlEditor({
     blockPreview.hidden = selectedRepresentation === "source";
     previewLoading.hidden = !previewPending;
     editButton.disabled ||= selectedRepresentation !== "source";
+    if (copyTransfer && pasteTransfer) {
+      copyTransfer.hidden = pasteTransfer.hidden = !embeddedYaml(entry);
+      copyTransfer.disabled = pasteTransfer.disabled = !canTransfer();
+    }
     if (replacementNotice) showStatus(text.replaced);
     else if (adapter && !availability.available && !pending && !converting)
       status.textContent = `${text.unavailable}${availability.reason ? ` ${availability.reason}` : ""}`;
@@ -897,17 +909,86 @@ export function mountYamlEditor({
     showStatus(text.ready);
     render();
   }
+  function embeddedYaml(entry: ReturnType<typeof metadata>) {
+    return Boolean(entry && entry.format !== "json" &&
+      (entry.format === "yaml" || /\.ya?ml$/i.test(entry.filename)) && entry.dataSource?.kind !== "url");
+  }
+  function canTransfer() {
+    const entry = metadata();
+    return Boolean(!disposed && dialog.open && !pending && !session && !sourceLocationDraft && !conversionRequest &&
+      embeddedYaml(entry) && (!entry?.activeRepresentation || entry.activeRepresentation === "source") &&
+      selectedRepresentation === "source" && displayedPreviewMatches() && inspect().available);
+  }
+  function transferJSON(source: string) {
+    return JSON.stringify({format: "turbowarp-yaml", version: 1, source});
+  }
+  function importTransfer(read: () => string | null | Promise<string | null>) {
+    if (!canTransfer() || !snapshot) return;
+    const saved = snapshot;
+    void operate(async (generation, owner) => {
+      const raw = await read();
+      if (raw === null || !current(generation, owner)) return;
+      const value = JSON.parse(raw);
+      if (value?.format !== "turbowarp-yaml" || value.version !== 1 || typeof value.source !== "string") {
+        throw new Error(japanese ? "作品間転送用の YAML 形式が無効です" : "Invalid YAML transfer");
+      }
+      if (new TextEncoder().encode(value.source).byteLength > 4194304) throw new Error(text.tooLarge);
+      await owner.prepare(saved, value.source);
+      if (!current(generation, owner) || !previewReady) return;
+      draft = value.source === saved.source ? null : value.source;
+      previewReady.source = draft ?? saved.source;
+      preview.value = previewReady.source;
+      showStatus(text.ready);
+    });
+  }
+  if (projectTransfer && copyTransfer && pasteTransfer) {
+    copyTransfer.addEventListener("click", () => {
+      if (!canTransfer() || !previewReady) return;
+      const source = previewReady.source;
+      void projectTransfer.copy(transferJSON(source), source).catch(cause => showError(cause));
+    });
+    pasteTransfer.addEventListener("click", () => importTransfer(() => projectTransfer.read()));
+    copyTransfer.addEventListener("dragstart", event => {
+      if (!event.isTrusted || !canTransfer() || !previewReady || !event.dataTransfer) {
+        event.preventDefault();
+        return;
+      }
+      try {
+        projectTransfer.drag(event.dataTransfer, transferJSON(previewReady.source));
+      } catch (cause) {
+        event.preventDefault();
+        showError(cause);
+      }
+    });
+    sourcePreview.addEventListener("dragover", event => {
+      if (event.isTrusted && event.dataTransfer && canTransfer() && projectTransfer.accepts(event.dataTransfer)) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      }
+    });
+    sourcePreview.addEventListener("drop", event => {
+      if (!event.isTrusted || !event.dataTransfer || !canTransfer()) return;
+      try {
+        const raw = projectTransfer.drop(event.dataTransfer);
+        if (raw === null) return;
+        event.preventDefault();
+        event.stopPropagation();
+        importTransfer(() => raw);
+      } catch (cause) {
+        showError(cause);
+      }
+    });
+  }
   function getPanelRequest(reference: DocumentReference) {
     if (disposed || docked) return;
     const entry = entries().find(item => same(item.reference, reference));
-    if (entry && entry.format !== "json" &&
-        (entry.format === "yaml" || /\.ya?ml$/i.test(entry.filename)) &&
-        entry.dataSource?.kind !== "url") {
+    if (entry && embeddedYaml(entry)) {
       return {
           reference,
           filename: entry.filename,
           mount(element: HTMLElement, close: () => void) {
-            const editor = mountYamlEditor({vm, getScratch, registry, readReference, document: doc, fetch: fetcher, language: locale},
+            const editor = mountYamlEditor({vm, getScratch, registry, readReference, document: doc, fetch: fetcher, language: locale,
+              projectTransfer},
               {element, close});
             void editor.open(reference);
             return editor;

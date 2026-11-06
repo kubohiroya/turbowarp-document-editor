@@ -41,6 +41,13 @@ export interface DocumentEditorOptions {
   language?: string;
   injectStyles?: boolean;
   openPanel?: (request: DocumentPanelRequest) => boolean;
+  projectTransfer?: {
+    copy(json: string, text: string): Promise<void>;
+    read(): Promise<string | null>;
+    drag(data: DataTransfer, json: string): void;
+    accepts(data: DataTransfer): boolean;
+    drop(data: DataTransfer): string | null;
+  };
 }
 export interface PreviewAttempt {owner: DocumentAdapter; snapshot: DocumentSnapshot; kind: string; source?: string;}
 export interface RepresentationOption {label: string; available: boolean; reason?: string; request: SourceDocumentRepresentationRequest | null;}
