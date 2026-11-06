@@ -22,6 +22,9 @@ const messages = {
     maximize: "全画面化",
     restore: "元のサイズに戻す",
     cancel: "キャンセル",
+    confirmClose: "変更を保存して文書を閉じますか？",
+    discard: "破棄して閉じる",
+    saveAndClose: "保存して閉じる",
     save: "表示されている形式に変換して検証・保存",
     document: "文書",
     selectOne: "文書を選択してください",
@@ -89,6 +92,9 @@ const messages = {
     maximize: "Maximize",
     restore: "Restore window",
     cancel: "Cancel",
+    confirmClose: "Save changes before closing this document?",
+    discard: "Discard changes",
+    saveAndClose: "Save and close",
     save: "Convert, validate and save the displayed format",
     document: "Document",
     selectOne: "Select a document",
@@ -144,6 +150,9 @@ const messages = {
   },
 };
 
+let nextPanelId = 0;
+type PanelMount = {element: HTMLElement; close(): void};
+
 export function mountYamlEditor({
   vm,
   getScratch,
@@ -152,7 +161,8 @@ export function mountYamlEditor({
   document: documentOption,
   fetch: fetchOption,
   language,
-}: DocumentEditorOptions) {
+  openPanel,
+}: DocumentEditorOptions, docked?: PanelMount) {
   if (!vm) throw new TypeError("An Editor VM is required.");
   const doc = documentOption || globalThis.document,
     win = doc.defaultView as HostWindow,
@@ -165,10 +175,14 @@ export function mountYamlEditor({
     new URLSearchParams(win.location.search).get("lang") ||
     doc.documentElement.lang;
   const text = messages[String(locale).startsWith("ja") ? "ja" : "en"];
+  const id = (value: string) => docked ? `${value}-${panelId}` : value;
+  const panelId = docked ? ++nextPanelId : 0;
   const dialog = doc.createElement("dialog");
-  dialog.className = "twpe-yaml-dialog";
+  if (docked) dialog.dataset.twpeDocumentPane = "";
+  const showDialog = () => docked ? dialog.show() : dialog.showModal();
+  dialog.className = docked ? "twpe-yaml-dialog twpe-yaml-window" : "twpe-yaml-dialog";
   const heading = doc.createElement("h2");
-  heading.id = "twpe-yaml-title";
+  heading.id = id("twpe-yaml-title");
   heading.textContent = text.title;
   dialog.setAttribute("aria-labelledby", heading.id);
   const closeButton = button("×");
@@ -183,7 +197,7 @@ export function mountYamlEditor({
   const selectionRow = paragraph(),
     selectionLabel = doc.createElement("label"),
     selection = doc.createElement("select");
-  selection.id = "twpe-yaml-document";
+  selection.id = id("twpe-yaml-document");
   selectionLabel.htmlFor = selection.id;
   selectionLabel.textContent = `${text.document}: `;
   selectionRow.append(selectionLabel, selection);
@@ -239,7 +253,7 @@ export function mountYamlEditor({
   tabToolbar.className = "twpe-yaml-tab-toolbar";
   tabToolbar.append(tablist, actions);
   const panel = doc.createElement("div");
-  panel.id = "twpe-yaml-tabpanel";
+  panel.id = id("twpe-yaml-tabpanel");
   panel.setAttribute("role", "tabpanel");
   panel.tabIndex = 0;
   conversions.append(externalHint, tabToolbar);
@@ -251,7 +265,7 @@ export function mountYamlEditor({
   error.setAttribute("role", "alert");
   error.setAttribute("aria-label", text.errorHeading);
   const preview = doc.createElement("textarea");
-  preview.id = "twpe-yaml-preview";
+  preview.id = id("twpe-yaml-preview");
   preview.readOnly = true;
   preview.spellcheck = false;
   const sourcePreview = doc.createElement("div");
@@ -268,7 +282,7 @@ export function mountYamlEditor({
   const sourceControls = doc.createElement("section");
   sourceControls.className = "twpe-source-controls";
   const sourceLocationLabel = doc.createElement("label"), sourceLocation = doc.createElement("select");
-  sourceLocation.id = "twpe-source-location";
+  sourceLocation.id = id("twpe-source-location");
   sourceLocationLabel.htmlFor = sourceLocation.id;
   sourceLocationLabel.textContent = text.location;
   for (const [value, label] of [["embedded-file", text.embeddedFile], ["url", text.urlSource]]) {
@@ -305,13 +319,13 @@ export function mountYamlEditor({
     panel,
   );
   dialog.append(titlebar, content, footer);
-  const dialogWindow = attachDialogWindow({
+  const dialogWindow = !docked && attachDialogWindow({
     dialog, titlebar, maximizeButton, maximizeLabel: text.maximize, restoreLabel: text.restore,
   });
   const confirmation = doc.createElement("dialog");
   confirmation.className = "twpe-yaml-dialog twpe-yaml-confirmation";
   const confirmationMessage = paragraph();
-  confirmationMessage.id = "twpe-yaml-confirmation-title";
+  confirmationMessage.id = id("twpe-yaml-confirmation-title");
   confirmation.setAttribute("aria-labelledby", confirmationMessage.id);
   const confirmationFooter = doc.createElement("div");
   confirmationFooter.className = "twpe-yaml-footer";
@@ -319,7 +333,12 @@ export function mountYamlEditor({
     confirmationOK = button("OK");
   confirmationFooter.append(confirmationCancel, confirmationOK);
   confirmation.append(confirmationMessage, confirmationFooter);
-  doc.body.append(dialog, confirmation);
+  (docked?.element || doc.body).append(dialog);
+  doc.body.append(confirmation);
+  const confirmationDiscard = button(text.discard);
+  confirmationDiscard.hidden = true;
+  confirmationFooter.insertBefore(confirmationDiscard, confirmationOK);
+  let closing = false;
   let disposed = false,
     epoch = 0,
     pending = false,
@@ -587,9 +606,10 @@ export function mountYamlEditor({
     );
     selection.value =
       selected && optionReferences.has(key(selected)) ? key(selected) : "";
-    selectionRow.hidden = listed.length < 2;
+    const inlineDraft = Boolean(docked && draft !== null && !sourceLocationDraft && !session);
+    selectionRow.hidden = Boolean(docked) || listed.length < 2;
     selection.disabled = pending || hasWork();
-    switchHint.hidden = !hasWork() || listed.length < 2;
+    switchHint.hidden = Boolean(docked) || !hasWork() || listed.length < 2;
     sourceName.textContent = snapshot?.sourceName || entry?.filename || "";
     heading.textContent = entry?.dialogTitle?.[String(locale).startsWith("ja") ? "ja" : "en"] || text.neutralTitle;
     const location = sourceLocationDraft || {kind: entry?.dataSource?.kind === "url" ? "url" : "embedded-file", url: entry?.dataSource?.url || ""};
@@ -597,7 +617,7 @@ export function mountYamlEditor({
     sourceLocation.value = location.kind;
     if (doc.activeElement !== sourceURL) sourceURL.value = location.url || "";
     sourceURL.hidden = location.kind !== "url";
-    sourceLocation.disabled = pending || Boolean(session) || active !== "source" || selectedRepresentation !== "source";
+    sourceLocation.disabled = pending || inlineDraft || Boolean(session) || active !== "source" || selectedRepresentation !== "source";
     sourceURL.disabled = sourceLocation.disabled;
     sourceLoad.disabled = sourceLocation.disabled || !sourceLocationDraft;
     sourceHint.hidden = entry?.dataSource?.kind !== "url" && location.kind !== "url";
@@ -617,6 +637,7 @@ export function mountYamlEditor({
       pending ||
       !availability.available ||
       !bridge ||
+      inlineDraft ||
       active !== "source" ||
       Boolean(conversionRequest) ||
       Boolean(sourceLocationDraft) || entry?.dataSource?.kind === "url";
@@ -648,7 +669,7 @@ export function mountYamlEditor({
     tablist.replaceChildren(
       ...[...representationOptions].map(([kind, item], index) => {
         const tab = button(item.label);
-        tab.id = `twpe-yaml-format-${index}`;
+        tab.id = id(`twpe-yaml-format-${index}`);
         tab.dataset.kind = kind;
         tab.setAttribute("role", "tab");
         tab.setAttribute("aria-controls", panel.id);
@@ -662,6 +683,7 @@ export function mountYamlEditor({
           !availability.available ||
           item.available === false ||
           (Boolean(session) && kind !== active) ||
+          (inlineDraft && kind !== "source") ||
           (Boolean(sourceLocationDraft) && kind !== "source");
         if (item.reason) tab.title = item.reason;
         return tab;
@@ -678,6 +700,9 @@ export function mountYamlEditor({
     activeNote.textContent =
       selectedRepresentation === active ? text.active : text.convertHint;
     externalHint.hidden = !session;
+    preview.readOnly = !docked || pending || !availability.available || Boolean(session) ||
+      Boolean(sourceLocationDraft) || entry?.dataSource?.kind === "url" ||
+      active !== "source" || selectedRepresentation !== "source" || !displayedPreviewMatches();
     preview.setAttribute("aria-label", formatLabel("source", entry));
     sourcePreview.hidden = selectedRepresentation !== "source";
     preview.hidden = selectedRepresentation !== "source";
@@ -742,6 +767,7 @@ export function mountYamlEditor({
     converting = false;
     if (confirmation.open) confirmation.close();
     confirmRequested = null;
+    closing = false;
     selectedRepresentation = null;
     endSession(session?.id);
     session = null;
@@ -772,7 +798,8 @@ export function mountYamlEditor({
     showStatus(text.ready);
     render();
     closeDialog();
-    restoreFocus();
+    if (docked) docked.close();
+    else restoreFocus();
   }
   function finishSaved() {
     clearWork();
@@ -781,10 +808,12 @@ export function mountYamlEditor({
     showStatus(text.saved);
     render();
     closeDialog();
-    restoreFocus();
+    if (docked) docked.close();
+    else restoreFocus();
   }
   function invalidate() {
     if (disposed || converting) return;
+    if (docked) return docked.close();
     const editing = Boolean(snapshot || session || conversionRequest);
     clearWork();
     if (editing) replacementNotice = true;
@@ -848,11 +877,45 @@ export function mountYamlEditor({
       if (current(generation, next)) {pending = false; render();}
     }
   }
+  function requestClose() {
+    if (disposed || commitLocked || (docked && pending)) return;
+    if (!docked || !hasWork()) return cancelWork();
+    if (confirmation.open) return;
+    closing = true;
+    confirmationMessage.textContent = text.confirmClose;
+    confirmationOK.textContent = text.saveAndClose;
+    confirmationOK.disabled = saveButton.disabled;
+    confirmationDiscard.hidden = false;
+    confirmation.showModal();
+    confirmationCancel.focus();
+  }
+  function editSource() {
+    if (preview.readOnly || !previewReady || !snapshot) return;
+    draft = preview.value === snapshot.source.replace(/\r\n?/g, "\n") ? null : preview.value;
+    previewReady.source = draft ?? snapshot.source;
+    error.textContent = "";
+    showStatus(text.ready);
+    render();
+  }
   async function openFromHat(anchor: {element: HTMLElement | SVGElement; reference?: DocumentReference; error?: unknown}) {
     if (disposed || pending || dialog.open) return;
+    const reference = anchor.reference;
+    const entry = reference && entries().find(item => same(item.reference, reference));
+    if (!anchor.error && reference && entry && entry.format !== "json" &&
+        (entry.format === "yaml" || /\.ya?ml$/i.test(entry.filename)) &&
+        entry.dataSource?.kind !== "url" && openPanel?.({
+          reference,
+          filename: entry.filename,
+          mount(element, close) {
+            const editor = mountYamlEditor({vm, getScratch, registry, readReference, document: doc, fetch: fetcher, language: locale},
+              {element, close});
+            void editor.open(reference);
+            return editor;
+          },
+        })) return;
     opener = anchor.element;
     error.textContent = "";
-    dialog.showModal();
+    showDialog();
     if (anchor.error) {
       showError(anchor.error);
       return;
@@ -860,11 +923,12 @@ export function mountYamlEditor({
     // Cancelling a dialog ends its private work. A new opening always captures live Editor state.
     await activate(anchor.reference!);
   }
-  closeButton.addEventListener("click", cancelWork);
-  cancelButton.addEventListener("click", cancelWork);
+  closeButton.addEventListener("click", requestClose);
+  cancelButton.addEventListener("click", requestClose);
+  preview.addEventListener("input", editSource);
   dialog.addEventListener("cancel", (event) => {
     event.preventDefault();
-    if (!commitLocked) cancelWork();
+    if (!commitLocked) requestClose();
   });
   dialog.addEventListener("close", () => {
     if (ignoredCloseEvents) {
@@ -955,10 +1019,12 @@ export function mountYamlEditor({
   });
   function dismissConfirmation() {
     confirmRequested = null;
+    closing = false;
     if (confirmation.open) confirmation.close();
     saveButton.focus();
   }
   confirmationCancel.addEventListener("click", dismissConfirmation);
+  confirmationDiscard.addEventListener("click", cancelWork);
   confirmation.addEventListener("cancel", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -967,6 +1033,11 @@ export function mountYamlEditor({
   confirmation.addEventListener("keydown", (event) => event.stopPropagation());
   confirmation.addEventListener("keyup", (event) => event.stopPropagation());
   confirmationOK.addEventListener("click", () => {
+    if (closing) {
+      dismissConfirmation();
+      saveButton.click();
+      return;
+    }
     const requested = confirmRequested;
     confirmRequested = null;
     confirmation.close();
@@ -1054,7 +1125,7 @@ export function mountYamlEditor({
         pending = false;
         commitLocked = false;
         render();
-        if (!dialog.open) dialog.showModal();
+        if (!dialog.open) showDialog();
         if (error.textContent) error.focus();
       }
     }
@@ -1102,6 +1173,9 @@ export function mountYamlEditor({
         return;
       }
       confirmRequested = { epoch, target: selectedRepresentation };
+      confirmationOK.textContent = "OK";
+      confirmationOK.disabled = false;
+      confirmationDiscard.hidden = true;
       confirmationMessage.textContent = text.confirmConversion(
         formatLabel(selectedRepresentation!),
       );
@@ -1137,7 +1211,7 @@ export function mountYamlEditor({
           try {
             await owner.commitRepresentation!(snapshot!, prepared);
           } catch (cause) {
-            if (current(generation, owner) && !dialog.open) dialog.showModal();
+            if (current(generation, owner) && !dialog.open) showDialog();
             throw cause;
           } finally {
             converting = false;
@@ -1172,7 +1246,7 @@ export function mountYamlEditor({
   const unsubscribe = registry.subscribe(render);
   showStatus(text.ready);
   render();
-  hatEntry = attachEmbeddedYamlHat({
+  if (!docked) hatEntry = attachEmbeddedYamlHat({
     vm,
     registry,
     readReference,
@@ -1198,9 +1272,15 @@ export function mountYamlEditor({
   return {
     dialog,
     ready,
+    requestClose,
+    async open(reference: DocumentReference) {
+      if (disposed || dialog.open) return;
+      showDialog();
+      await activate(reference);
+    },
     refresh: () => {
       render();
-      hatEntry.refresh();
+      hatEntry?.refresh();
     },
     getState: () => ({
       pending,
@@ -1223,8 +1303,8 @@ export function mountYamlEditor({
       win.removeEventListener("focus", refreshExternalPreview);
       projectEvents.off?.("PROJECT_LOADED", invalidate);
       vm.runtime?.off?.("RUNTIME_DISPOSED", invalidate);
-      hatEntry.dispose();
-      dialogWindow.dispose();
+      hatEntry?.dispose();
+      if (dialogWindow) dialogWindow.dispose();
       confirmation.remove();
       dialog.remove();
     },

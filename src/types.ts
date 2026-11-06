@@ -26,6 +26,11 @@ export interface ScratchHost {
   gui: {getBlockly(): HostObject | Promise<HostObject>; getBlocklyEagerly?(): HostObject | null | Promise<HostObject | null>};
 }
 export type HostWindow = Window & typeof globalThis & {Scratch?: ScratchHost; ScratchBlocks?: HostObject};
+export interface DocumentPanelRequest {
+  reference: DocumentReference;
+  filename: string;
+  mount(element: HTMLElement, close: () => void): Disposable & {requestClose(): void};
+}
 export interface DocumentEditorOptions {
   vm: HostObject;
   document?: Document;
@@ -35,6 +40,7 @@ export interface DocumentEditorOptions {
   fetch?: typeof fetch;
   language?: string;
   injectStyles?: boolean;
+  openPanel?: (request: DocumentPanelRequest) => boolean;
 }
 export interface PreviewAttempt {owner: DocumentAdapter; snapshot: DocumentSnapshot; kind: string; source?: string;}
 export interface RepresentationOption {label: string; available: boolean; reason?: string; request: SourceDocumentRepresentationRequest | null;}
