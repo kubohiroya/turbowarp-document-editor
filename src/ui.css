@@ -22,7 +22,8 @@
 .twpe-yaml-source-preview { position: relative; }
 .twpe-yaml-source-preview[hidden] { display: none; }
 .twpe-yaml-dialog .twpe-yaml-source-preview textarea { margin-top: 0; }
-.twpe-yaml-dialog .twpe-yaml-external-edit { position: absolute; top: 12px; right: 12px; z-index: 1; box-shadow: 0 2px 6px rgb(0 0 0 / 15%); }
+/* The button floats over the text area, so it needs a surface of its own in both themes. */
+.twpe-yaml-dialog .twpe-yaml-external-edit { position: absolute; top: 12px; right: 12px; z-index: 1; background: var(--ui-tertiary, white); box-shadow: 0 2px 6px rgb(0 0 0 / 15%); }
 .twpe-yaml-dialog textarea { display: block; width: 100%; box-sizing: border-box; min-height: 304px; margin-top: 8px; padding: 12px; resize: vertical; border: 1px solid var(--ui-black-transparent, #738c99); border-radius: 6px; font: 13px/1.6 ui-monospace, monospace; background: var(--input-background, white); color: inherit; }
 .twpe-yaml-error { color: var(--block-editor-error-text, #a12517); white-space: pre-wrap; overflow-wrap: anywhere; }
 .twpe-yaml-source-name { overflow-wrap: anywhere; }
