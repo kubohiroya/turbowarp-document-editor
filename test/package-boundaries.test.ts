@@ -2,6 +2,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
 import {build} from 'esbuild';
 import * as entry from '../src/index.ts';
 const {documentEditorStyles} = entry;
@@ -32,5 +33,7 @@ test('Webpack 4 adapter preserves the host config and applies to each compilatio
         const filename = adapted.resolve.alias['@kubohiroya/' + name];
         assert((await fs.stat(filename)).isFile());
     }
+    assert.equal(adapted.resolve.alias['@kubohiroya/turbowarp-document-data/composition$'],
+        fileURLToPath(import.meta.resolve('@kubohiroya/turbowarp-document-data/composition')));
     assert(adapted.module.rules[0].include.length > 1);
 });

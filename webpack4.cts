@@ -25,7 +25,7 @@ function withDocumentEditorWebpack4(config: WebpackConfig | WebpackConfig[]): We
     const source = '@kubohiroya/turbowarp-document-source';
     const documents = '@kubohiroya/turbowarp-document-data';
     const sourceRoot = path.dirname(require.resolve(`${source}/package.json`));
-    const documentsRoot = path.dirname(require.resolve(`${documents}/package.json`, {paths: [sourceRoot]}));
+    const documentsRoot = path.dirname(require.resolve(`${documents}/package.json`));
     const yamlRoot = path.dirname(require.resolve('yaml/package.json'));
     const roots = [__dirname, sourceRoot, documentsRoot, yamlRoot];
     const adaptRule = (rule: WebpackRule): WebpackRule => ({...rule,
