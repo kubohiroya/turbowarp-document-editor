@@ -37,7 +37,7 @@ editor.dispose();
 
 There is no startup switch. What appears is decided by the registered providers: a hat gets its file icon when a provider owns its document, and source-location controls (file inside the SB3 or external URL) appear for documents whose provider marks their location as editable. A project without such a provider looks exactly as in upstream TurboWarp.
 
-The package inserts its stylesheet once when mounted. Hosts that load CSS themselves can use `injectStyles: false` and `@kubohiroya/turbowarp-document-editor/style.css`.
+The package inserts its stylesheet once when mounted. Hosts that load CSS themselves can use `injectStyles: false` and `@kubohiroya/turbowarp-document-editor/style.css`. Colours read the GUI theme's custom properties (`--ui-modal-background`, `--ui-modal-foreground`, `--ui-black-transparent`, `--input-background`, `--ui-secondary`, `--link-color`, `--looks-secondary`), so the dialog follows light, dark and auto. Hosts that set none of them get the package's original light palette through the fallbacks.
 
 For Webpack 4, wrap the host configuration with `withDocumentEditorWebpack4` from `@kubohiroya/turbowarp-document-editor/webpack4`. The adapter resolves package subpaths and includes the compiled ESM in the host's existing Babel rule. GUI hosts consume generated JavaScript and declaration files; they do not need a TypeScript loader.
 

@@ -132,7 +132,8 @@ export async function renderBlockPreview({container, model, getScratch, vm, sign
         cancelled();
         // inject normally changes Blockly.mainWorkspace; the Editor keeps ownership throughout.
         workspace = B.inject(surface, {readOnly: true, scrollbars: true, sounds: false, trashcan: false,
-            media: main.options?.pathToMedia, RTL: Boolean(main.RTL),
+            // The Editor's own workspace colours carry its theme, so the preview follows it too.
+            media: main.options?.pathToMedia, RTL: Boolean(main.RTL), colours: main.options?.colours,
             zoom: {controls: true, wheel: true, startScale: 0.85, minScale: 0.25, maxScale: 1.5}});
         restoreMain();
         surface.dataset.workspaceId = workspace!.id;

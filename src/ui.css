@@ -1,15 +1,19 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-.twpe-yaml-dialog { box-sizing: border-box; font: 14px/1.5 system-ui, sans-serif; color: #163c4a; background: #eefbff; }
-.twpe-yaml-dialog button { min-height: 40px; padding: 7px 13px; border: 1px solid #44778b; border-radius: 7px; background: white; color: #163c4a; font: inherit; cursor: pointer; }
+/*
+ * Colours come from the GUI theme's custom properties so the dialog follows light, dark and
+ * auto. The fallbacks keep the package's own palette where a host sets no theme.
+ */
+.twpe-yaml-dialog { box-sizing: border-box; font: 14px/1.5 system-ui, sans-serif; color: var(--ui-modal-foreground, #163c4a); background: var(--ui-modal-background, #eefbff); }
+.twpe-yaml-dialog button { min-height: 40px; padding: 7px 13px; border: 1px solid var(--ui-black-transparent, #44778b); border-radius: 7px; background: var(--ui-secondary, white); color: inherit; font: inherit; cursor: pointer; }
 .twpe-yaml-dialog button:disabled { opacity: .55; cursor: default; }
-.twpe-yaml-dialog a:focus-visible, .twpe-yaml-dialog select:focus-visible, .twpe-yaml-dialog button:focus-visible, .twpe-yaml-dialog textarea:focus-visible { outline: 3px solid #007fa8; outline-offset: 2px; }
-.twpe-yaml-dialog { position: fixed; width: min(900px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #44778b; border-radius: 12px; overflow: auto; }
+.twpe-yaml-dialog a:focus-visible, .twpe-yaml-dialog select:focus-visible, .twpe-yaml-dialog button:focus-visible, .twpe-yaml-dialog textarea:focus-visible { outline: 3px solid var(--looks-secondary, #007fa8); outline-offset: 2px; }
+.twpe-yaml-dialog { position: fixed; width: min(900px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid var(--ui-black-transparent, #44778b); border-radius: 12px; overflow: auto; }
 .twpe-yaml-dialog::backdrop { background: rgb(0 0 0 / 45%); }
 .twpe-yaml-titlebar { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding-right: 88px; padding-bottom: 18px; cursor: move; touch-action: none; user-select: none; }
 .twpe-yaml-dialog h2 { margin: 0; font-size: 20px; }
 .twpe-yaml-title-filename { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: 20px; font-weight: 700; }
 .twpe-yaml-window-actions { position: absolute; top: 0; right: 0; display: flex; gap: 6px; }
-.twpe-yaml-actions > a { align-self: center; padding: 10px 2px; color: #065e84; overflow-wrap: anywhere; }
+.twpe-yaml-actions > a { align-self: center; padding: 10px 2px; color: var(--link-color, #065e84); overflow-wrap: anywhere; }
 .twpe-yaml-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-left: auto; padding-bottom: 4px; }
 .twpe-yaml-reference { display: inline-flex; align-items: center; gap: 6px; }
 .twpe-yaml-reference[hidden] { display: none; }
@@ -18,25 +22,26 @@
 .twpe-yaml-source-preview { position: relative; }
 .twpe-yaml-source-preview[hidden] { display: none; }
 .twpe-yaml-dialog .twpe-yaml-source-preview textarea { margin-top: 0; }
-.twpe-yaml-dialog .twpe-yaml-external-edit { position: absolute; top: 12px; right: 12px; z-index: 1; box-shadow: 0 2px 6px rgb(0 0 0 / 15%); }
-.twpe-yaml-dialog textarea { display: block; width: 100%; box-sizing: border-box; min-height: 304px; margin-top: 8px; padding: 12px; resize: vertical; border: 1px solid #738c99; border-radius: 6px; font: 13px/1.6 ui-monospace, monospace; background: white; color: #172a33; }
-.twpe-yaml-error { color: #a12517; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The button floats over the text area, so it needs a surface of its own in both themes. */
+.twpe-yaml-dialog .twpe-yaml-external-edit { position: absolute; top: 12px; right: 12px; z-index: 1; background: var(--ui-tertiary, white); box-shadow: 0 2px 6px rgb(0 0 0 / 15%); }
+.twpe-yaml-dialog textarea { display: block; width: 100%; box-sizing: border-box; min-height: 304px; margin-top: 8px; padding: 12px; resize: vertical; border: 1px solid var(--ui-black-transparent, #738c99); border-radius: 6px; font: 13px/1.6 ui-monospace, monospace; background: var(--input-background, white); color: inherit; }
+.twpe-yaml-error { color: var(--block-editor-error-text, #a12517); white-space: pre-wrap; overflow-wrap: anywhere; }
 .twpe-yaml-source-name { overflow-wrap: anywhere; }
 @media (max-width: 560px) {
     .twpe-yaml-dialog { width: calc(100vw - 16px); padding: 16px; }
 }
 .twpe-yaml-dialog .twpe-yaml-close, .twpe-yaml-dialog .twpe-yaml-maximize { min-height: 36px; width: 36px; padding: 0; display: grid; place-items: center; font-size: 26px; line-height: 1; }
-.twpe-yaml-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #bfd7e0; }
+.twpe-yaml-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--ui-black-transparent, #bfd7e0); }
 .twpe-yaml-dialog .twpe-yaml-save { background: #007fa8; color: white; border-color: #007fa8; }
 .twpe-yaml-dialog select { max-width: 100%; min-height: 40px; font: inherit; }
-.twpe-yaml-tab-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 16px; margin-top: 16px; border-bottom: 2px solid #44778b; }
+.twpe-yaml-tab-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 16px; margin-top: 16px; border-bottom: 2px solid var(--ui-black-transparent, #44778b); }
 .twpe-yaml-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
-.twpe-yaml-dialog .twpe-yaml-tabs [role="tab"] { border-radius: 7px 7px 0 0; border-bottom: 0; background: #ddecf2; }
+.twpe-yaml-dialog .twpe-yaml-tabs [role="tab"] { border-radius: 7px 7px 0 0; border-bottom: 0; background: var(--ui-secondary, #ddecf2); }
 .twpe-yaml-dialog .twpe-yaml-tabs [aria-selected="true"] { color: #fff; background: #006f93; }
 .twpe-yaml-dialog [role="tabpanel"] { padding-top: 4px; }
 .twpe-yaml-confirmation { width: min(480px, calc(100vw - 32px)); }
 .twpe-yaml-confirmation > p { margin: 0 0 16px; font-size: 18px; }
-.twpe-yaml-block-preview { position: relative; height: 424px; min-height: 220px; border: 1px solid #738c99; border-radius: 6px; overflow: hidden; background: #f9fbfc; }
+.twpe-yaml-block-preview { position: relative; height: 424px; min-height: 220px; border: 1px solid var(--ui-black-transparent, #738c99); border-radius: 6px; overflow: hidden; background: var(--input-background, #f9fbfc); }
 .twpe-yaml-block-preview[hidden] { display: none; }
 .twpe-yaml-dialog .twpe-yaml-save { white-space: normal; }
 @media (max-width: 560px) { .twpe-yaml-footer { align-items: stretch; } .twpe-yaml-save { flex: 1; } .twpe-yaml-block-preview { height: 384px; } }
@@ -67,10 +72,10 @@
 
 .twpe-source-controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
 .twpe-source-controls[hidden] { display:none; }
-.twpe-source-controls input { flex:1; min-width:120px; max-width:100%; box-sizing:border-box; min-height:40px; padding:8px; font:inherit; }
+.twpe-source-controls input { flex:1; min-width:120px; max-width:100%; box-sizing:border-box; min-height:40px; padding:8px; font:inherit; border:1px solid var(--ui-black-transparent, #738c99); border-radius:6px; background:var(--input-background, white); color:inherit; }
 .twpe-source-controls input[hidden] { display:none; }
 .twpe-source-controls p { flex-basis:100%; margin:0; }
-.twpe-source-controls input:focus-visible { outline:3px solid #007fa8; outline-offset:2px; }
+.twpe-source-controls input:focus-visible { outline:3px solid var(--looks-secondary, #007fa8); outline-offset:2px; }
 
 .twpe-yaml-content .twpe-yaml-source-preview:not([hidden]) { display:flex; flex:1 0 auto; min-height:0; }
 

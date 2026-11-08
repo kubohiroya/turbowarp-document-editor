@@ -32,7 +32,7 @@ const editor = mountDocumentEditor({
 
 起動時のスイッチはありません。何が出るかは登録された提供元が決めます。提供元が所有する文書のハットにファイルのアイコンが付き、提供元が参照元を変更できるとした文書では参照元（SB3内のファイル・外部URL）の操作が出ます。そのような提供元のない作品は、本家のTurboWarpと同じ見た目です。
 
-スタイルはマウント時に一度挿入します。ホストがCSSを別途読み込む場合は `injectStyles: false` と `@kubohiroya/turbowarp-document-editor/style.css` を使用できます。Webpack 4では `@kubohiroya/turbowarp-document-editor/webpack4` の `withDocumentEditorWebpack4(config)` でサブパスの解決とホストのBabel対象を追加します。
+スタイルはマウント時に一度挿入します。ホストがCSSを別途読み込む場合は `injectStyles: false` と `@kubohiroya/turbowarp-document-editor/style.css` を使用できます。配色はGUIのテーマが与えるカスタムプロパティ（`--ui-modal-background`、`--ui-modal-foreground`、`--ui-black-transparent`、`--input-background`、`--ui-secondary`、`--link-color`、`--looks-secondary`）を参照し、light・dark・autoに追従します。これらを設定しないホストでは、フォールバックとして従来のライト配色で表示します。Webpack 4では `@kubohiroya/turbowarp-document-editor/webpack4` の `withDocumentEditorWebpack4(config)` でサブパスの解決とホストのBabel対象を追加します。
 
 ### YAML プレビューの位置指定
 
