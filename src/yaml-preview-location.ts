@@ -2,6 +2,22 @@
 import type {DocumentEntry, DocumentReference, DocumentRegistry, HostObject, SearchableYamlDocument, YamlPreviewRange} from './types.ts';
 
 export const documentKey = ({providerId, documentId}: DocumentReference) => JSON.stringify([providerId, documentId]);
+export const normalizeYamlLineEndings = (source: string) => source.replace(/\r\n?/g, '\n');
+
+export function replaceYamlSourceRange(source: string, range: YamlPreviewRange, expectedSource: string, replacement: string) {
+    const normalized = normalizeYamlLineEndings(source);
+    const {start, end, expectedText} = range;
+    if (normalized !== expectedSource || !Number.isInteger(start) || !Number.isInteger(end) ||
+        start < 0 || end <= start || end > normalized.length || normalized.slice(start, end) !== expectedText) return;
+    let rawStart = start;
+    let rawEnd = end;
+    for (const {index} of source.matchAll(/\r\n/g)) {
+        if (index >= rawEnd) break;
+        if (index < rawStart) rawStart++;
+        rawEnd++;
+    }
+    return source.slice(0, rawStart) + replacement + source.slice(rawEnd);
+}
 
 export function isYaml(entry: DocumentEntry | undefined): entry is DocumentEntry {
     return Boolean(entry && (entry.format === 'yaml' || (!entry.format && /\.ya?ml$/i.test(entry.filename))));
@@ -33,7 +49,7 @@ export function readSearchableYamlDocuments(vm: HostObject, registry: DocumentRe
             try {
                 if (!adapter.inspect().available) return [];
                 const {source} = adapter.capture();
-                return [{reference: entry.reference, filename: entry.filename, source: source.replace(/\r\n?/g, '\n')}];
+                return [{reference: entry.reference, filename: entry.filename, source: normalizeYamlLineEndings(source)}];
             } finally {
                 adapter.dispose();
             }
@@ -46,7 +62,7 @@ export function readSearchableYamlDocuments(vm: HostObject, registry: DocumentRe
 export function selectYamlPreviewRange(preview: HTMLTextAreaElement, range: YamlPreviewRange) {
     const {start, end, expectedText} = range;
     const value = preview.value;
-    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > value.length ||
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end > value.length ||
         (expectedText !== undefined && value.slice(start, end) !== expectedText)) return false;
     const doc = preview.ownerDocument;
     const styles = doc.defaultView!.getComputedStyle(preview);
@@ -58,7 +74,7 @@ export function selectYamlPreviewRange(preview: HTMLTextAreaElement, range: Yaml
         whiteSpace: styles.whiteSpace, overflowWrap: styles.overflowWrap, tabSize: styles.tabSize
     });
     const marker = doc.createElement('span');
-    marker.textContent = value.slice(start, end);
+    marker.textContent = value.slice(start, end) || '\u200b';
     mirror.append(value.slice(0, start), marker, value.slice(end));
     doc.body.append(mirror);
     const {offsetTop, offsetLeft} = marker;

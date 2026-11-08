@@ -38,6 +38,8 @@ const editor = mountDocumentEditor({
 
 `editor.getSearchableYamlDocuments()` は、作品のハットが参照する利用可能な SB3 内 YAML ファイルを、文書参照・ファイル名・本文とともに返します。本文の改行は LF に統一します。`editor.openYamlPreview(reference, {start, end, expectedText})` は対象文書を開き、UTF-16 の半開区間 `[start, end)` を選択して表示します。戻り値は要求を受け付けたかを示し、実際の選択はプレビューの読み込み後に行います。`expectedText` を指定した場合は、範囲の本文が一致するときだけ選択します。
 
+`editor.stageYamlReplacement(reference, range, source, text)` は、検索時の本文と一致範囲を照合して置換をプレビューに下書きします。`source` には検索時に取得した LF 改行の本文を渡します。ユーザーが保存すると、文書提供元が検証して作品に反映します。
+
 ## 保存と変換
 
 タブ切替は非同期で、古い応答を破棄します。同一セッションのプレビュー候補を保存時にも使います。キャンセル・閉じるではVMを変更しません。保存は所有者の検証と差分適用を呼び出し、関係するブロック・文書メタデータだけを更新します。SB3全体の圧縮・再読込・作品の停止はしません。

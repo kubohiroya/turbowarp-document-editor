@@ -181,6 +181,30 @@ test("YAML preview opens and scrolls to a normalized source range", async () => 
     await page.close();
   }
 });
+
+test("a YAML search replacement stays a draft until the owner validates and saves it", async () => {
+  const page = await browser.newPage();
+  try {
+    await readyPage(page);
+    const accepted = await page.evaluate(() => {
+      const source = window.fixture.docs["notes:two"].replaceAll("\r\n", "\n");
+      const expectedText = "second";
+      const start = source.indexOf(expectedText);
+      return window.ui.stageYamlReplacement({providerId: "notes", documentId: "two"},
+        {start, end: start + expectedText.length, expectedText}, source, "第二章");
+    });
+    assert.equal(accepted, true);
+    await page.waitForFunction(() => window.ui.getState().hasDraft);
+    assert.equal(await page.locator(".twpe-yaml-source-preview textarea").inputValue(), "# user comment\ntitle: 第二章\n");
+    assert.equal(await page.evaluate(() => window.fixture.docs["notes:two"]), "# user comment\r\ntitle: second\r\n");
+    await page.locator(".twpe-yaml-save").click();
+    await page.waitForFunction(() => window.fixture.docs["notes:two"] === "# user comment\r\ntitle: 第二章\r\n");
+    assert.deepEqual(await page.evaluate(() => window.fixture.calls.filter((call: unknown) => typeof call === "string" && call.endsWith("notes:two"))),
+      ["prepare:notes:two", "commit:notes:two"]);
+  } finally {
+    await page.close();
+  }
+});
 async function startSelected(page: Page) {
   await page
     .getByRole("button", { name: /^(外部エディタで編集|Edit in external editor)$/u })
