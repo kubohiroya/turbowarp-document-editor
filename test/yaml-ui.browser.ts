@@ -150,6 +150,37 @@ async function readyPage(page: Page, language = "ja") {
   await page.waitForFunction(() => window.fixtureReady);
   await icon(page).waitFor();
 }
+test("YAML preview opens and scrolls to a normalized source range", async () => {
+  const page = await browser.newPage();
+  try {
+    await readyPage(page);
+    const opened = await page.evaluate(() => {
+      const source = Array.from({length: 160}, (_, i) => `line${i}: 値\r\n`).join("") +
+        "title: 📚検索対象\r\n";
+      window.fixture.docs["notes:two"] = source;
+      const text = source.replaceAll("\r\n", "\n");
+      const start = text.indexOf("検索対象");
+      return {
+        start,
+        accepted: window.ui.openYamlPreview({providerId: "notes", documentId: "two"},
+          {start, end: start + 4, expectedText: "検索対象"}),
+      };
+    });
+    assert.equal(opened.accepted, true);
+    await page.waitForFunction(start => {
+      const field = document.querySelector<HTMLTextAreaElement>(".twpe-yaml-source-preview textarea");
+      return field?.selectionStart === start && field.selectionEnd === start + 4 && field.scrollTop > 0 &&
+        field.value.slice(field.selectionStart, field.selectionEnd) === "検索対象";
+    }, opened.start);
+    assert.equal(await page.evaluate(() => window.ui.getState().hasDraft), false);
+    assert.equal(await page.evaluate(() => {
+      window.ui.openYamlPreview({providerId: "notes", documentId: "two"}, {start: 0, end: 4, expectedText: "stale"});
+      return (document.activeElement as HTMLTextAreaElement).selectionStart;
+    }), opened.start);
+  } finally {
+    await page.close();
+  }
+});
 async function startSelected(page: Page) {
   await page
     .getByRole("button", { name: /^(外部エディタで編集|Edit in external editor)$/u })

@@ -34,6 +34,10 @@ const editor = mountDocumentEditor({
 
 スタイルはマウント時に一度挿入します。ホストがCSSを別途読み込む場合は `injectStyles: false` と `@kubohiroya/turbowarp-document-editor/style.css` を使用できます。Webpack 4では `@kubohiroya/turbowarp-document-editor/webpack4` の `withDocumentEditorWebpack4(config)` でサブパスの解決とホストのBabel対象を追加します。
 
+### YAML プレビューの位置指定
+
+`editor.getSearchableYamlDocuments()` は、作品のハットが参照する利用可能な SB3 内 YAML ファイルを、文書参照・ファイル名・本文とともに返します。本文の改行は LF に統一します。`editor.openYamlPreview(reference, {start, end, expectedText})` は対象文書を開き、UTF-16 の半開区間 `[start, end)` を選択して表示します。戻り値は要求を受け付けたかを示し、実際の選択はプレビューの読み込み後に行います。`expectedText` を指定した場合は、範囲の本文が一致するときだけ選択します。
+
 ## 保存と変換
 
 タブ切替は非同期で、古い応答を破棄します。同一セッションのプレビュー候補を保存時にも使います。キャンセル・閉じるではVMを変更しません。保存は所有者の検証と差分適用を呼び出し、関係するブロック・文書メタデータだけを更新します。SB3全体の圧縮・再読込・作品の停止はしません。
