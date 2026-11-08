@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 import type {DocumentEditorOptions} from './types.ts';
 export type {DocumentEditorOptions, DocumentAdapter, DocumentRegistry, DocumentReference, DocumentPanelRequest} from './types.ts';
+export type {SearchableYamlDocument, YamlPreviewRange} from './types.ts';
 import {mountYamlEditor} from './client.ts';
 import {documentEditorStyles} from './styles.ts';
 export {documentEditorStyles};

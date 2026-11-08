@@ -26,6 +26,18 @@ export interface ScratchHost {
   gui: {getBlockly(): HostObject | Promise<HostObject>; getBlocklyEagerly?(): HostObject | null | Promise<HostObject | null>};
 }
 export type HostWindow = Window & typeof globalThis & {Scratch?: ScratchHost; ScratchBlocks?: HostObject};
+/** A half-open range in UTF-16 code units, after normalizing line endings to LF. */
+export interface YamlPreviewRange {
+  readonly start: number;
+  readonly end: number;
+  readonly expectedText?: string;
+}
+export interface SearchableYamlDocument {
+  readonly reference: DocumentReference;
+  readonly filename: string;
+  /** YAML source with LF line endings, matching the preview's text coordinates. */
+  readonly source: string;
+}
 export interface DocumentPanelRequest {
   reference: DocumentReference;
   filename: string;

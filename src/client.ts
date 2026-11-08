@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
-import type {CompanionConfig, Disposable, DocumentAdapter, DocumentEditorOptions, DocumentReference, DocumentSnapshot, ExternalSession, HostWindow, PreviewAttempt, PreviewReady, RepresentationOption} from './types.ts';
+import type {CompanionConfig, Disposable, DocumentAdapter, DocumentEditorOptions, DocumentReference, DocumentSnapshot, ExternalSession, HostWindow, PreviewAttempt, PreviewReady, RepresentationOption, YamlPreviewRange} from './types.ts';
 import { createEmbeddedYamlDocument } from "./document.ts";
 import { renderBlockPreview } from "./block-preview.ts";
 import { focusDocumentReference } from "./focus-document.ts";
 import { attachEmbeddedYamlHat } from "./hat-entry.ts";
 import { getYamlEditorProviders } from "./provider-bootstrap.ts";
 import { attachDialogWindow } from "./dialog-window.ts";
+import { documentKey, isYaml, normalizeYamlLineEndings, readSearchableYamlDocuments,
+  replaceYamlSourceRange, selectYamlPreviewRange } from "./yaml-preview-location.ts";
 
 const messages = {
   ja: {
@@ -152,6 +154,7 @@ const messages = {
 
 let nextPanelId = 0;
 type PanelMount = {element: HTMLElement; close(): void; externalFile?: boolean};
+type YamlPreviewRequest = {range: YamlPreviewRange; replacement?: {source: string; text: string}};
 
 export function mountYamlEditor({
   vm,
@@ -377,8 +380,9 @@ export function mountYamlEditor({
     previewPending = false;
   let optionReferences = new Map<string, DocumentReference>(),
     representationOptions = new Map<string, RepresentationOption>();
-  const key = (reference: DocumentReference) =>
-    JSON.stringify([reference.providerId, reference.documentId]);
+  let previewRequest: YamlPreviewRequest | undefined;
+  const panelPreviews = new Map<string, (request: YamlPreviewRequest) => boolean>();
+  const key = documentKey;
   const same = (a: DocumentReference | null, b: DocumentReference | null) => Boolean(a && b && key(a) === key(b));
   function paragraph(content = "") {
     const node = doc.createElement("p");
@@ -517,6 +521,7 @@ export function mountYamlEditor({
       if (valid()) {
         previewPending = false;
         render();
+        applyPreviewRange();
       }
     }
   }
@@ -794,6 +799,7 @@ export function mountYamlEditor({
     adapter?.dispose();
     adapter = null;
     selected = null;
+    previewRequest = undefined;
     preview.value = "";
   }
   function closeDialog() {
@@ -865,7 +871,7 @@ export function mountYamlEditor({
       }
     }
   }
-  async function activate(reference: DocumentReference) {
+  async function activate(reference: DocumentReference, request?: YamlPreviewRequest) {
     if (disposed || pending || hasWork()) return;
     let next: DocumentAdapter | undefined, refusal: unknown;
     try {
@@ -885,6 +891,7 @@ export function mountYamlEditor({
     clearWork();
     adapter = next;
     selected = reference;
+    previewRequest = request;
     const generation = epoch;
     pending = true;
     render();
@@ -989,7 +996,36 @@ export function mountYamlEditor({
       }
     });
   }
-  function getPanelRequest(reference: DocumentReference) {
+  function applyPreviewRange() {
+    if (!previewRequest || selectedRepresentation !== "source" || !displayedPreviewMatches()) return;
+    const {range, replacement} = previewRequest;
+    previewRequest = undefined;
+    if (replacement) {
+      const changed = replaceYamlSourceRange(previewReady!.source, range, replacement.source, replacement.text);
+      if (hasWork() || changed === undefined) {
+        showError(new Error(japanese ? "YAML が変更されています。もう一度検索してください。" :
+          "The YAML has changed. Search again before replacing."));
+        return;
+      }
+      draft = changed === previewReady!.source ? null : changed;
+      previewReady!.source = changed;
+      preview.value = changed;
+      showStatus(japanese ? "置換内容を確認し、保存してください。" : "Review the replacement and save it.");
+      render();
+      const expectedText = normalizeYamlLineEndings(replacement.text);
+      selectYamlPreviewRange(preview, {start: range.start, end: range.start + expectedText.length, expectedText});
+      return;
+    }
+    selectYamlPreviewRange(preview, range);
+  }
+  function revealPreview(request: YamlPreviewRequest) {
+    if (disposed || ((request.replacement || selectedRepresentation !== "source") && hasWork())) return false;
+    previewRequest = request;
+    if (selectedRepresentation !== "source" && !pending) chooseFormat("source");
+    applyPreviewRange();
+    return true;
+  }
+  function createPanelRequest(reference: DocumentReference, request?: YamlPreviewRequest) {
     if (disposed || docked) return;
     const entry = entries().find(item => same(item.reference, reference));
     if (entry && embeddedYaml(entry)) {
@@ -1000,11 +1036,40 @@ export function mountYamlEditor({
             const editor = mountYamlEditor({vm, getScratch, registry, readReference, document: doc, fetch: fetcher, language: locale,
               projectTransfer},
               {element, close});
-            void editor.open(reference);
-            return editor;
+            const reveal = editor.revealPreview;
+            panelPreviews.set(key(reference), reveal);
+            void editor.open(reference, request?.range);
+            if (request?.replacement) reveal(request);
+            return {
+              requestClose: editor.requestClose,
+              dispose() {
+                if (panelPreviews.get(key(reference)) === reveal) panelPreviews.delete(key(reference));
+                editor.dispose();
+              },
+            };
           },
       };
     }
+  }
+  function getPanelRequest(reference: DocumentReference) {
+    return createPanelRequest(reference);
+  }
+  function requestYamlPreview(reference: DocumentReference, request: YamlPreviewRequest) {
+    const entry = entries().find(item => same(item.reference, reference));
+    if (disposed || !isYaml(entry) || entry.available === false || (request.replacement && !embeddedYaml(entry)) ||
+        (entry.activeRepresentation && entry.activeRepresentation !== "source")) return false;
+    if (dialog.open) {
+      if (same(selected, reference)) return revealPreview(request);
+      if (docked || pending || hasWork()) return false;
+    } else {
+      const mounted = panelPreviews.get(key(reference));
+      const panel = createPanelRequest(reference, request);
+      if (panel && openPanel?.(panel)) return mounted ? mounted(request) : true;
+      opener = doc.activeElement as HTMLElement | null;
+      showDialog();
+    }
+    void activate(reference, request);
+    return true;
   }
   async function openFromHat(anchor: {element: HTMLElement | SVGElement; reference?: DocumentReference; error?: unknown}) {
     if (disposed || pending || dialog.open) return;
@@ -1378,11 +1443,16 @@ export function mountYamlEditor({
     ready,
     requestClose,
     getPanelRequest,
+    getSearchableYamlDocuments: () => disposed ? [] : readSearchableYamlDocuments(vm, registry, readReference),
+    openYamlPreview: (reference: DocumentReference, range: YamlPreviewRange) => requestYamlPreview(reference, {range}),
+    stageYamlReplacement: (reference: DocumentReference, range: YamlPreviewRange, source: string, text: string) =>
+      requestYamlPreview(reference, {range, replacement: {source, text}}),
+    revealPreview,
     subscribePanelRequests: (listener: () => void) => registry.subscribe(listener),
-    async open(reference: DocumentReference) {
+    async open(reference: DocumentReference, range?: YamlPreviewRange) {
       if (disposed || dialog.open) return;
       showDialog();
-      await activate(reference);
+      await activate(reference, range ? {range} : undefined);
     },
     refresh: () => {
       render();
