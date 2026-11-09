@@ -5,7 +5,7 @@ export type {SearchableYamlDocument, YamlPreviewRange} from './types.ts';
 import {mountYamlEditor} from './client.ts';
 import {documentEditorStyles} from './styles.ts';
 export {documentEditorStyles};
-export {registerDocumentSourceRootHatShape} from '@kubohiroya/turbowarp-document-source';
+export {registerDocumentSourceRootHatShape} from '@kubohiroya/turbowarp-document-data/document-source';
 
 export function mountDocumentEditor(options: DocumentEditorOptions) {
     const doc = options.document || globalThis.document;

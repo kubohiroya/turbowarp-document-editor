@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 import type {HostObject, HostWindow, ScratchHost} from './types.ts';
 // A separate read-only ScratchBlocks workspace; it never registers an extension with the VM.
-import {embeddedYamlRootHatShapeExtension, registerEmbeddedYamlRootHatShape, type EmbeddedYamlRootShapeHost} from '@kubohiroya/turbowarp-document-source';
+import {embeddedYamlRootHatShapeExtension, registerEmbeddedYamlRootHatShape, type EmbeddedYamlRootShapeHost} from '@kubohiroya/turbowarp-document-data/document-source';
 let serial = 0;
 const record = (value: unknown): value is HostObject => value !== null && typeof value === 'object' && !Array.isArray(value);
 const valueOf = (field: unknown) => Array.isArray(field) ? field[0] : record(field) ? field.value : field;

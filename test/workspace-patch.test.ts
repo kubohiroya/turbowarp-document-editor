@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {projectPatchWorkspaceAdapterSymbol} from '@kubohiroya/turbowarp-document-source/project-views';
+import {projectPatchWorkspaceAdapterSymbol} from '@kubohiroya/turbowarp-document-data/project-views';
 import {attachDocumentWorkspacePatch} from '../src/workspace-patch.ts';
 
 test('the workspace capability recognizes only current own native block registrations', () => {

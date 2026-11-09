@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 import type {HostObject} from './types.ts';
-import {installProjectPatchWorkspaceAdapter} from '@kubohiroya/turbowarp-document-source/project-views';
+import {installProjectPatchWorkspaceAdapter} from '@kubohiroya/turbowarp-document-data/project-views';
 
 /** Redraw only affected document scripts; retain the remaining workspace and its variables. */
 export function attachDocumentWorkspacePatch(vm: HostObject, B: HostObject) {
