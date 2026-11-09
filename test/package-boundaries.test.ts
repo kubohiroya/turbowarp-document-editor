@@ -14,8 +14,10 @@ test('the package has no startup switch: a host mounts the editor and providers 
 test('the browser entry is host-independent and the injected CSS equals the optional stylesheet', async () => {
     assert.equal(documentEditorStyles, await fs.readFile(new URL('../src/ui.css', import.meta.url), 'utf8'));
     const result = await build({entryPoints: [new URL('../src/index.ts', import.meta.url).pathname], bundle: true,
-        platform: 'browser', format: 'esm', write: false, metafile: true, logLevel: 'silent'});
-    const inputs = Object.keys(result.metafile.inputs);
+        platform: 'browser', format: 'esm', write: false, metafile: true, logLevel: 'silent', outdir: 'out'});
+    // document-data's source integration re-exports a yaml-json icon; only code that reaches the bundle counts.
+    const [output] = Object.values(result.metafile.outputs);
+    const inputs = Object.entries(output.inputs).filter(([, input]) => input.bytesInOutput > 0).map(([input]) => input);
     assert(!inputs.some(input => /(?:turbowarp-(?:plus-editor|kamishibai-app)|scratch-(?:gui|vm|blocks)|node\/(?:host|vscode|schema)|source-documents|yaml-json)/u.test(input)), inputs.join('\n'));
     const manifest = JSON.parse(await fs.readFile(new URL('../package.json', import.meta.url), 'utf8'));
     assert.equal(manifest.main, manifest.exports['.'].default);
@@ -29,7 +31,8 @@ test('Webpack 4 adapter preserves the host config and applies to each compilatio
     const [adapted] = withDocumentEditorWebpack4([config]);
     assert.equal(adapted.resolve.alias['existing$'], config.resolve.alias['existing$']);
     assert.equal(config.module.rules[0].include, '/host/src');
-    for (const name of ['turbowarp-document-editor$', 'turbowarp-document-source/project-views$', 'turbowarp-document-data/composition$']) {
+    for (const name of ['turbowarp-document-editor$', 'turbowarp-document-source/protocol$', 'turbowarp-document-data/composition$',
+        'turbowarp-document-data/document-source$', 'turbowarp-document-data/project-views$', 'turbowarp-yaml-json/yaml-blocks$']) {
         const filename = adapted.resolve.alias['@kubohiroya/' + name];
         assert((await fs.stat(filename)).isFile());
     }

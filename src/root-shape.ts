@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 import type {HostObject, ScratchHost} from './types.ts';
 interface RootShapeWindow {ScratchBlocks?: HostObject; Scratch?: {gui?: Partial<ScratchHost['gui']>}; setTimeout?(callback: () => void, delay: number): unknown;}
-import {registerEmbeddedYamlRootHatShape, type EmbeddedYamlRootShapeHost} from '@kubohiroya/turbowarp-document-source';
+import {registerEmbeddedYamlRootHatShape, type EmbeddedYamlRootShapeHost} from '@kubohiroya/turbowarp-document-data/document-source';
 
 // Stored root blocks must remain readable even when document editing is disabled.
 export async function initializeEmbeddedYamlRootShape({window: win = globalThis.window, timeoutMs = 30000}: {window?: RootShapeWindow; timeoutMs?: number} = {}) {

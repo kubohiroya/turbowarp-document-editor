@@ -2,7 +2,7 @@
 // Test-only document owner moved from turbowarp-plus-editor test/document-sources.browser.ts.
 // The shared registry supplies source locations to any provider, not one App.
 import YAML from 'yaml';
-import {getDocumentSourceRegistry, installDocumentSourceMarker, type DocumentSourceVM} from '@kubohiroya/turbowarp-document-source';
+import {getDocumentSourceRegistry, installDocumentSourceMarker, type DocumentSourceVM} from '@kubohiroya/turbowarp-document-data/document-source';
 import type {DocumentSnapshot, HostObject} from '../../src/types.ts';
 
 export const owner = 'twpesourcefixture';

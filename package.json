@@ -94,9 +94,9 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@kubohiroya/turbowarp-document-source": "0.1.0-rc.0",
+    "@kubohiroya/turbowarp-document-source": "0.4.0",
     "@kubohiroya/turbowarp-extension-data-editor": "0.7.0",
-    "@kubohiroya/turbowarp-document-data": "0.6.0-rc.2",
+    "@kubohiroya/turbowarp-document-data": "0.6.0",
     "yaml": "2.9.1",
     "ajv": "8.20.0"
   },

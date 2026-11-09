@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 import type {HostObject, DocumentRegistry, DocumentReference, ScratchHost} from './types.ts';
 import {bindBlockEditorIcon} from '@kubohiroya/turbowarp-extension-data-editor/turbowarp';
-import {registerEmbeddedYamlRootHatShape, type EmbeddedYamlRootShapeHost} from '@kubohiroya/turbowarp-document-source';
+import {registerEmbeddedYamlRootHatShape, type EmbeddedYamlRootShapeHost} from '@kubohiroya/turbowarp-document-data/document-source';
 import {attachDocumentWorkspacePatch} from './workspace-patch.ts';
 
 export function attachEmbeddedYamlHat({vm, registry, readReference, window: win, getScratch, label, canOpen, onOpen, onError = console.error}: {vm: HostObject; registry: DocumentRegistry; readReference: (block: HostObject, target?: HostObject) => DocumentReference; window: Window; getScratch: () => ScratchHost | undefined; label: string; canOpen: () => boolean; onOpen: (anchor: {element: HTMLElement | SVGElement; blockId: string; targetId: string; reference?: DocumentReference; error?: unknown}) => void; onError?: (error: unknown) => void}) {
