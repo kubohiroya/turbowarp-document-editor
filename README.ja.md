@@ -56,6 +56,8 @@ npx @kubohiroya/turbowarp-document-editor --site-dir /absolute/path/to/built-gui
 
 連携ホストは127.0.0.1に限定し、Origin・Host・セッショントークンを検査します。専用ディレクトリ内の文書だけをVSCodeへ渡し、JSON Schema設定もセッションごとに分離します。既存の連携プロトコル名は互換性のため維持しています。
 
+作品フォルダのファイルタブも、同じ連携ホストを使えます。`config.formats` は対応する `yaml`・`json`・`text` を返します。`format: 'text'` のセッションは、JavaScript・Markdown などのファイル名を保って作業コピーを開き、JSON Schema は設定しません。VSCode のワークスペースファイルは末尾に `.txt` を付けてテキストとして開きます。変更の取得・再起動・セッション終了の API は従来と共通で、終了後も作業コピーを保持します。切り戻す場合は `text` 対応を revert して再ビルドします。従来の YAML・JSON の API は変更しません。
+
 ## 検証・切戻し
 
 `npm test` は変換プレビュー・差分適用・外部編集ホストを検証します。`npm run test:browser` は日英・狭幅・ウィンドウ操作・非同期競合・保存・キャンセルをChromeで検証します。ネイティブVSCodeの起動テストは含みません。
