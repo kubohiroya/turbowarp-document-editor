@@ -51,6 +51,33 @@ function rawRequest(origin: string, pathname: string, headers: Record<string, st
     });
 }
 
+test('plain text sessions preserve filenames and reuse the authenticated workcopy lifecycle', async t => {
+    const f = await fixture(t);
+    assert.deepEqual(f.config.formats, ['yaml', 'json', 'text']);
+    for (const filename of ['hello.ts', 'README.md', '.gitignore', 'editor.code-workspace']) {
+        const source = '// text\nconst value = 1;\n';
+        const response = await f.create(source, {format: 'text', sourceName: filename});
+        assert.equal(response.status, 201);
+        const session = await response.json();
+        const [file, profile] = f.launches.at(-1)!;
+        assert.equal(path.basename(file), filename.endsWith('.code-workspace') ? `${filename}.txt` : filename);
+        assert.equal(profile.format, 'text');
+        assert.equal(profile.workspaceFile, undefined);
+        assert.equal(await readFile(file, 'utf8'), source);
+        const endpoint = `${f.host.apiOrigin}/__twpe_yaml/sessions/${session.id}`;
+        await writeFile(file, 'changed\n');
+        const read = await fetch(endpoint, {headers: f.headers});
+        assert.equal((await read.json()).source, 'changed\n');
+        assert.equal((await fetch(endpoint, {method: 'POST', headers: f.headers})).status, 200);
+        assert.equal(f.launches.at(-1)![0], file);
+        assert.equal((await fetch(endpoint, {method: 'DELETE', headers: f.headers})).status, 200);
+        assert.equal(await readFile(file, 'utf8'), 'changed\n');
+    }
+    assert.equal((await f.create('text', {format: 'text', sourceName: '../escape.txt'})).status, 400);
+    assert.equal((await f.create('text', {format: 'text', sourceName: '.twpe'})).status, 400);
+    assert.equal((await f.create('text', {format: 'text', schema: {id: 'urn:test', schema: {}}})).status, 400);
+});
+
 test('serves the local Editor and a same-origin config without putting a token in the URL', async t => {
     const f = await fixture(t);
     assert.equal(f.config.available, true);

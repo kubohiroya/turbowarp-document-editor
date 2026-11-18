@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 import type {SpawnOptions} from 'node:child_process';
 export interface ProfilePaths {userDataDirectory: string; extensionsDirectory: string;}
-export interface LaunchProfile extends ProfilePaths {workspaceFile?: string; schemaFile?: string; schemaId?: string; format?: 'yaml' | 'json';}
+export interface LaunchProfile extends ProfilePaths {workspaceFile?: string; schemaFile?: string; schemaId?: string; format?: 'yaml' | 'json' | 'text';}
 export interface ChildProcessPort {
  once(event: string, listener: (...args: any[]) => void): unknown;
  kill(): unknown;

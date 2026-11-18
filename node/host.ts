@@ -166,7 +166,7 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
         if (closing) throw failure(503, 'HOST_CLOSED', 'The local YAML host is closing.');
         if (pathname === `${apiPrefix}/config`) {
             if (request.method !== 'GET') throw failure(405, 'METHOD_NOT_ALLOWED', 'Use GET for configuration.');
-            json(response, 200, {available: true, token, editor: 'VSCode', maxSourceBytes});
+            json(response, 200, {available: true, token, editor: 'VSCode', maxSourceBytes, formats: ['yaml', 'json', 'text']});
             return;
         }
         authorizeToken(request);
@@ -179,22 +179,28 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
                     throw failure(400, 'INVALID_SESSION', 'Supply source and optional sourceName, schema and format.');
                 }
                 const format = input.format === undefined ? 'yaml' : input.format;
-                if (!['yaml', 'json'].includes(format)) throw failure(400, 'INVALID_FORMAT', 'Choose YAML or JSON.');
+                if (!['yaml', 'json', 'text'].includes(format)) throw failure(400, 'INVALID_FORMAT', 'Choose YAML, JSON or text.');
                 if (typeof input.source !== 'string') throw failure(400, 'INVALID_SOURCE', 'The YAML source must be a string.');
                 if (Buffer.byteLength(input.source, 'utf8') > maxSourceBytes) throw failure(413, 'SOURCE_TOO_LARGE', 'The YAML exceeds the size limit.');
                 if (input.sourceName !== undefined && (typeof input.sourceName !== 'string' || input.sourceName.length > 256 || /[/\\\x00-\x1f\x7f]/u.test(input.sourceName) || ['.', '..'].includes(input.sourceName))) {
                     throw failure(400, 'INVALID_SOURCE_NAME', 'The source name must be a plain filename.');
                 }
                 let schema;
+                if (format === 'text' && input.schema !== undefined) throw failure(400, 'INVALID_SCHEMA', 'Plain text sessions do not use a JSON Schema.');
                 try { schema = input.schema === undefined ? undefined : normalizeSourceDocumentSchema(input.schema); }
                 catch { throw failure(400, 'INVALID_SCHEMA', 'Supply a bounded inline JSON Schema object.'); }
                 const id = randomBytes(16).toString('hex');
                 const directory = path.join(sessionsRoot, id);
-                const suffix = format === 'json' ? '.json' : '.yml';
+                const suffix = format === 'text' ? '.txt' : format === 'json' ? '.json' : '.yml';
                 const suppliedName = input.sourceName || `document${suffix}`;
                 let filename = suppliedName.replace(/[<>:"|?*]/gu, '_').replace(/[. ]+$/gu, '');
                 if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu.test(filename)) filename = `_${filename}`;
-                if (!(format === 'json' ? /\.json$/iu : /\.ya?ml$/iu).test(filename)) filename += suffix;
+                if (format === 'text') {
+                    if (!filename) filename = 'document.txt';
+                    if (filename === '.twpe') throw failure(400, 'INVALID_SOURCE_NAME', 'This filename is reserved for session metadata.');
+                    // Open workspace files as text, without treating their content as VSCode workspace settings.
+                    if (/\.code-workspace$/iu.test(filename)) filename += '.txt';
+                } else if (!(format === 'json' ? /\.json$/iu : /\.ya?ml$/iu).test(filename)) filename += suffix;
                 if (Buffer.byteLength(filename) > 240) throw failure(400, 'INVALID_SOURCE_NAME', 'The UTF-8 source filename is too long.');
                 const filePath = path.join(directory, filename);
                 await mkdir(directory, {mode: 0o700});
@@ -202,7 +208,7 @@ export async function startDocumentEditorHost({siteDirectory, dataDirectory, lau
                 const metadataDirectory = path.join(directory, '.twpe');
                 await mkdir(metadataDirectory, {mode: 0o700});
                 await writeFile(path.join(metadataDirectory, 'session.json'), JSON.stringify({id, sourceName: input.sourceName || filename, format, createdAt: new Date().toISOString(), vscodeProfile: profile.directory}), {mode: 0o600, flag: 'wx'});
-                const schemaWorkspace = await writeSchemaWorkspace(directory, schema, {format, filename});
+                const schemaWorkspace = format === 'text' ? null : await writeSchemaWorkspace(directory, schema, {format, filename});
                 const launchOptions = {...profile, format, ...(schemaWorkspace || {})};
                 const session = {filePath, source: input.source, revision: 1, launchOptions};
                 try { await launchEditor(filePath, launchOptions); }
