@@ -1,6 +1,6 @@
 {
   "name": "@kubohiroya/turbowarp-document-editor",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Reusable document-source dialog, block previews and external editing for TurboWarp GUI hosts.",
   "type": "module",
   "license": "MPL-2.0",
@@ -95,7 +95,7 @@
   },
   "dependencies": {
     "@kubohiroya/turbowarp-document-source": "0.4.1",
-    "@kubohiroya/turbowarp-extension-data-editor": "0.11.4",
+    "@kubohiroya/turbowarp-extension-data-editor": "0.11.5",
     "@kubohiroya/turbowarp-document-data": "0.8.2",
     "yaml": "2.9.1",
     "ajv": "8.20.0"
