@@ -22,3 +22,19 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - run: npm run pack:check
+      # Match the ScratchBlocks revision pinned by the Editor integration.
+      - uses: actions/checkout@v4
+        with:
+          repository: TurboWarp/scratch-blocks
+          ref: 4113c5348e6b4c76da9071a1800a62ab96ef793f
+          path: .test-fixtures/scratch-blocks
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /blockly_compressed_vertical.js
+            /blocks_compressed_vertical.js
+            /msg/scratch_msgs.js
+      - name: Test native preview visibility
+        run: node --test test/block-preview-visibility.native.ts
+        env:
+          TWPE_TEST_SCRATCH_BLOCKS: ${{ github.workspace }}/.test-fixtures/scratch-blocks
