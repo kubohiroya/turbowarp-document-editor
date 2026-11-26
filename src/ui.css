@@ -26,7 +26,7 @@
 .twpe-yaml-dialog .twpe-yaml-external-edit { position: absolute; top: 12px; right: 12px; z-index: 1; background: var(--ui-tertiary, white); box-shadow: 0 2px 6px rgb(0 0 0 / 15%); }
 .twpe-yaml-dialog textarea { display: block; width: 100%; box-sizing: border-box; min-height: 304px; margin-top: 8px; padding: 12px; resize: vertical; border: 1px solid var(--ui-black-transparent, #738c99); border-radius: 6px; font: 13px/1.6 ui-monospace, monospace; background: var(--input-background, white); color: inherit; }
 .twpe-yaml-error { color: var(--block-editor-error-text, #a12517); white-space: pre-wrap; overflow-wrap: anywhere; }
-.twpe-yaml-error:empty { display: none; }
+.twpe-yaml-error:empty { margin: 0; }
 .twpe-yaml-source-name { overflow-wrap: anywhere; }
 @media (max-width: 560px) {
     .twpe-yaml-dialog { width: calc(100vw - 16px); padding: 16px; }
