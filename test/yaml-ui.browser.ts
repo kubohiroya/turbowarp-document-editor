@@ -1088,6 +1088,18 @@ test("script data tabs mark the saved format without a separate note", async () 
       assert.equal(await current.locator(".twpe-yaml-actions button").count(), 0);
       assert.equal(await current.getByText("保存されている原文（プレビュー）", {exact: true}).count(), 0);
       const panel = current.getByRole("tabpanel");
+      const documentChooser = current.locator(".twpe-yaml-footer").getByRole("combobox", {name: "文書:"});
+      assert.equal(await documentChooser.isVisible(), true);
+      const positions = await current.evaluate((dialog) => {
+        const bounds = (selector: string) => dialog.querySelector(selector)!.getBoundingClientRect();
+        const title = bounds(".twpe-yaml-titlebar"), tabs = bounds(".twpe-yaml-tab-toolbar");
+        const chooser = bounds(".twpe-yaml-document-selection"), footer = bounds(".twpe-yaml-footer");
+        const panel = bounds('[role="tabpanel"]');
+        return {titleToTabs: tabs.top - title.bottom, chooserAtLeft: chooser.left === footer.left,
+          chooserBelowPanel: chooser.top >= panel.bottom};
+      });
+      assert(positions.titleToTabs >= 0 && positions.titleToTabs <= 4);
+      assert(positions.chooserAtLeft && positions.chooserBelowPanel);
       const savedTab = current.getByRole("tab", {name: "YAMLテキスト", exact: true});
       assert.equal(await savedTab.locator(".twpe-yaml-saved-format[aria-hidden=true]").count(), 1);
       assert.equal(await savedTab.getAttribute("title"), "保存済み");

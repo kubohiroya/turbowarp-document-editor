@@ -200,7 +200,7 @@ export function mountYamlEditor({
   const windowActions = doc.createElement("div");
   windowActions.className = "twpe-yaml-window-actions";
   windowActions.append(maximizeButton, closeButton);
-  const selectionRow = paragraph(),
+  const selectionRow = doc.createElement("div"),
     selectionLabel = doc.createElement("label"),
     selection = doc.createElement("select");
   selectionRow.className = "twpe-yaml-document-selection";
@@ -258,6 +258,7 @@ export function mountYamlEditor({
   activeNote.className = "twpe-yaml-format-note";
   externalHint.textContent = text.externalHint;
   switchHint.textContent = text.switchHint;
+  selectionRow.append(switchHint);
   const tablist = doc.createElement("div");
   tablist.className = "twpe-yaml-tabs";
   tablist.setAttribute("role", "tablist");
@@ -269,7 +270,7 @@ export function mountYamlEditor({
   panel.id = id("twpe-yaml-tabpanel");
   panel.setAttribute("role", "tabpanel");
   panel.tabIndex = 0;
-  conversions.append(externalHint, tabToolbar);
+  conversions.append(tabToolbar, externalHint);
   const status = paragraph();
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
@@ -309,11 +310,14 @@ export function mountYamlEditor({
   sourceLoad.className = "twpe-source-load";
   sourceControls.append(sourceLocationLabel, sourceLocation, sourceURL, sourceLoad, sourceHint);
   const footer = doc.createElement("div");
-  footer.className = "twpe-yaml-footer";
+  footer.className = "twpe-yaml-footer twpe-yaml-document-footer";
+  const footerActions = doc.createElement("div");
+  footerActions.className = "twpe-yaml-footer-actions";
   const cancelButton = button(text.cancel),
     saveButton = button(text.save);
   saveButton.className = "twpe-yaml-save";
-  footer.append(cancelButton, saveButton);
+  footerActions.append(cancelButton, saveButton);
+  footer.append(selectionRow, footerActions);
   panel.append(
     activeNote,
     status,
@@ -324,13 +328,7 @@ export function mountYamlEditor({
   );
   const content = doc.createElement("div");
   content.className = "twpe-yaml-content";
-  content.append(
-    selectionRow,
-    sourceControls,
-    conversions,
-    switchHint,
-    panel,
-  );
+  content.append(conversions, sourceControls, panel);
   dialog.append(titlebar, content, footer);
   const dialogWindow = !docked && attachDialogWindow({
     dialog, titlebar, maximizeButton, maximizeLabel: text.maximize, restoreLabel: text.restore,
