@@ -73,7 +73,7 @@ const messages = {
       "選択した変換は利用できなくなりました。変換先を選び直してください。",
     preparingConversion: "変換する内容を検証しています…",
     conversionFailed: "変換できませんでした。原文と作品を確認してください。",
-    active: "💽=保存済み形式",
+    active: "保存済み",
     convertHint: "このタブで表示されている形式に変換して保存できます",
     source: "原文",
     viaSource:
@@ -143,7 +143,7 @@ const messages = {
       "The selected conversion is no longer available. Choose a conversion again.",
     preparingConversion: "Validating the conversion…",
     conversionFailed: "Conversion failed. Check the source and project.",
-    active: "💽=Saved format",
+    active: "Saved",
     convertHint: "You can convert to the format shown in this tab and save it.",
     source: "Source",
     viaSource:
@@ -203,9 +203,10 @@ export function mountYamlEditor({
   const selectionRow = paragraph(),
     selectionLabel = doc.createElement("label"),
     selection = doc.createElement("select");
+  selectionRow.className = "twpe-yaml-document-selection";
   selection.id = id("twpe-yaml-document");
   selectionLabel.htmlFor = selection.id;
-  selectionLabel.textContent = `${text.document}: `;
+  selectionLabel.textContent = `${text.document}:`;
   selectionRow.append(selectionLabel, selection);
   const sourceName = doc.createElement("strong");
   sourceName.className = "twpe-yaml-title-filename";
@@ -702,6 +703,18 @@ export function mountYamlEditor({
           (inlineDraft && kind !== "source") ||
           (Boolean(sourceLocationDraft) && kind !== "source");
         if (item.reason) tab.title = item.reason;
+        if (kind === active) {
+          const savedIcon = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
+          savedIcon.classList.add("twpe-yaml-saved-format");
+          savedIcon.setAttribute("viewBox", "0 0 20 20");
+          savedIcon.setAttribute("aria-hidden", "true");
+          const check = doc.createElementNS("http://www.w3.org/2000/svg", "path");
+          check.setAttribute("d", "M4 10l4 4 8-8");
+          savedIcon.append(check);
+          tab.append(savedIcon);
+          tab.title = item.reason ? `${text.active}\n${item.reason}` : text.active;
+          tab.setAttribute("aria-description", text.active);
+        }
         return tab;
       }),
     );
@@ -713,8 +726,8 @@ export function mountYamlEditor({
       [...tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
         .find((tab) => tab.dataset.kind === focusedTab && !tab.disabled)
         ?.focus();
-    activeNote.textContent =
-      selectedRepresentation === active ? text.active : text.convertHint;
+    activeNote.textContent = text.convertHint;
+    activeNote.hidden = selectedRepresentation === active;
     externalHint.hidden = !session;
     preview.readOnly = !docked || pending || !availability.available || Boolean(session) ||
       Boolean(sourceLocationDraft) || entry?.dataSource?.kind === "url" ||

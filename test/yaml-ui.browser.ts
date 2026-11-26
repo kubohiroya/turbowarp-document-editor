@@ -17,7 +17,7 @@ import { build } from "esbuild";
 
 let browser: Browser, server: Server, directory: string, base: string;
 const requests = [];
-const harness = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><style>html,body{height:100%;margin:0}#app{height:100%;background:#eee}.fixture-gui-screen{position:absolute;inset:0;background:#eee}svg{position:absolute;top:100px;left:50px}</style><link rel="stylesheet" href="yaml-editor/ui.css"></head><body><div id="app"><div class="fixture-gui-screen">Editor fixture<svg width="600" height="120"><g id="hat-icon"><rect width="50" height="40" fill="purple"/><text y="25" fill="white">One</text></g><g id="hat-two" transform="translate(100,0)"><rect width="50" height="40" fill="purple"/></g><g id="hat-pref" transform="translate(200,0)"><rect width="50" height="40" fill="blue"/></g><g id="flyout-icon" transform="translate(300,0)"><rect width="50" height="40" fill="gray"/></g><g id="other-icon" transform="translate(400,0)"><rect width="50" height="40" fill="green"/></g></svg></div></div><script type="module">
+const harness = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><style>html,body{height:100%;margin:0}#app{height:100%;background:#eee}.fixture-gui-screen{position:absolute;inset:0;background:#eee}.fixture-gui-screen>svg{position:absolute;top:100px;left:50px}</style><link rel="stylesheet" href="yaml-editor/ui.css"></head><body><div id="app"><div class="fixture-gui-screen">Editor fixture<svg width="600" height="120"><g id="hat-icon"><rect width="50" height="40" fill="purple"/><text y="25" fill="white">One</text></g><g id="hat-two" transform="translate(100,0)"><rect width="50" height="40" fill="purple"/></g><g id="hat-pref" transform="translate(200,0)"><rect width="50" height="40" fill="blue"/></g><g id="flyout-icon" transform="translate(300,0)"><rect width="50" height="40" fill="gray"/></g><g id="other-icon" transform="translate(400,0)"><rect width="50" height="40" fill="green"/></g></svg></div></div><script type="module">
 import {mountYamlEditor} from './yaml-editor/client.js';
 import {getSourceDocumentRegistry as getProviderRegistry, encodeSourceDocumentReference as encodeReference} from './fixture-document.js';
 const state=window.fixture={docs:{'notes:one':'theme: light','notes:two':'# user comment\\r\\ntitle: second\\r\\n','preferences:one':'{\"mode\":\"compact\"}\\r\\n'},sessions:{},calls:[],available:true,delayed:false,generation:0};
@@ -1074,7 +1074,7 @@ test("a conversion capability removed before or during Save cannot execute a hid
   }
 });
 
-test("script data labels, saved-format notes and external editing stay inside their tab", async () => {
+test("script data tabs mark the saved format without a separate note", async () => {
   for (const width of [1280, 390]) {
     const page = await browser.newPage({viewport: {width, height: 900}});
     try {
@@ -1088,7 +1088,16 @@ test("script data labels, saved-format notes and external editing stay inside th
       assert.equal(await current.locator(".twpe-yaml-actions button").count(), 0);
       assert.equal(await current.getByText("保存されている原文（プレビュー）", {exact: true}).count(), 0);
       const panel = current.getByRole("tabpanel");
-      assert.equal(await panel.getByText("💽=保存済み形式", {exact: true}).isVisible(), true);
+      const savedTab = current.getByRole("tab", {name: "YAMLテキスト", exact: true});
+      assert.equal(await savedTab.locator(".twpe-yaml-saved-format[aria-hidden=true]").count(), 1);
+      assert.equal(await savedTab.getAttribute("title"), "保存済み");
+      assert.equal(await savedTab.getAttribute("aria-description"), "保存済み");
+      assert.equal(await savedTab.locator(".twpe-yaml-saved-format").evaluate((icon) => {
+        const a = icon.getBoundingClientRect(), b = icon.parentElement!.getBoundingClientRect();
+        return a.width > 0 && a.height > 0 && a.left >= b.left && a.right <= b.right &&
+          a.top >= b.top && a.bottom <= b.bottom;
+      }), true);
+      assert.equal(await panel.locator(".twpe-yaml-format-note").isHidden(), true);
       const guide = current.locator(".twpe-yaml-guide");
       assert.equal(await guide.textContent(), "ℹ️ガイドを参照");
       assert.equal(await guide.getAttribute("target"), "_blank");
@@ -1113,6 +1122,8 @@ test("script data labels, saved-format notes and external editing stay inside th
       assert(layout.rightInset >= 10 && layout.rightInset <= 14);
       assert(layout.topInset >= 10 && layout.topInset <= 14);
       await selectConversion(page);
+      assert.equal(await savedTab.locator(".twpe-yaml-saved-format").count(), 1);
+      assert.equal(await current.getByRole("tab", {name: "YAMLブロック", exact: true}).locator(".twpe-yaml-saved-format").count(), 0);
       assert.equal(await panel.getByText("このタブで表示されている形式に変換して保存できます", {exact: true}).isVisible(), true);
       assert.equal(await panel.getByText("💽=保存済み形式", {exact: true}).count(), 0);
       assert.equal(await edit.isVisible(), false);
@@ -1174,7 +1185,9 @@ test("English script data labels retain the same tab-local actions", async () =>
     await current.waitFor();
     assert.deepEqual(await current.getByRole("tab").allTextContents(),
       ["YAML text", "YAML blocks", "Script blocks"]);
-    assert.equal(await current.getByRole("tabpanel").getByText("💽=Saved format", {exact: true}).isVisible(), true);
+    assert.equal(await current.getByRole("tab", {name: "YAML text", exact: true}).getAttribute("title"), "Saved");
+    assert.equal(await current.getByRole("tab", {name: "YAML text", exact: true}).getAttribute("aria-description"), "Saved");
+    assert.equal(await current.getByRole("tabpanel").locator(".twpe-yaml-format-note").isHidden(), true);
     assert.equal(await current.getByRole("button", {name: "Edit in external editor", exact: true}).isVisible(), true);
     await current.getByRole("tab", {name: "YAML blocks", exact: true}).click();
     assert.equal(await current.getByText("You can convert to the format shown in this tab and save it.", {exact: true}).isVisible(), true);
@@ -1262,6 +1275,9 @@ test("three accessible tabs mark the saved format, select by keyboard and confir
   await saveConversion(page);
   await closed(page);
   await open(page);
+  assert.equal(await page.getByRole("tab", {name: "YAMLブロック", exact: true}).locator(".twpe-yaml-saved-format").count(), 1);
+  assert.equal(await page.getByRole("tab", {name: "YAMLテキスト", exact: true}).getAttribute("aria-description"), null);
+  assert.equal(await dialog(page).locator(".twpe-yaml-saved-format").count(), 1);
   assert.equal(
     await page
       .getByRole("tab", { name: "YAMLブロック", exact: true })
@@ -1382,9 +1398,9 @@ test("tab previews display only the selected owner model and ignore an older asy
   );
   assert.equal(
     await page
-      .getByText("💽=保存済み形式", { exact: true })
-      .isVisible(),
-    true,
+      .getByRole("tab", { name: "YAMLテキスト", exact: true })
+      .getAttribute("title"),
+    "保存済み",
   );
   await page.evaluate(() => (window.fixture.delayPreviewKind = "yaml-blocks"));
   await page
